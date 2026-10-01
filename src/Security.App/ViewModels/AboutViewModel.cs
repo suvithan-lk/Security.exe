@@ -29,7 +29,7 @@ public sealed class AboutViewModel : ViewModelBase
 
     public string Phase => VersionInfo.Phase;
 
-    /// <summary>"Version 0.2.0 — Phase 2"</summary>
+    /// <summary>"Version 0.3.0 — Phase 3"</summary>
     public string VersionLine => $"Version {Version} — {Phase}";
 
     public string BuildLine => $"{ProductName} · {Tagline}";
@@ -49,24 +49,26 @@ public sealed class AboutViewModel : ViewModelBase
     public string SecurityPosture =>
         "• Runs entirely on this machine — no cloud calls, no external biometric APIs.\n" +
         "• Face embeddings are encrypted with Windows DPAPI (CurrentUser) before they reach disk.\n" +
-        "• Raw camera frames are never persisted or logged.\n" +
+        "• Raw camera frames are never logged; they reach disk only as opt-in unknown-face snapshots (OFF by default).\n" +
         "• No passwords, PINs, or credentials are ever stored.\n" +
         "• Windows sign-in is never bypassed, modified, or simulated.";
 
     public string PrivacyPosture =>
         $"Security events stored: {(_settings.Current.StoreSecurityEvents ? "ON" : "OFF")}\n" +
-        $"Image snapshots stored: {(_settings.Current.StoreSnapshots ? "ON (not recommended)" : "OFF")}\n" +
-        "Events record timestamps and outcomes only — never biometric samples.";
+        $"Image snapshots stored: {(_settings.Current.StoreSnapshots ? "ON (opt-in, local only)" : "OFF")}\n" +
+        "Events record timestamps and outcomes only — never biometric samples.\n" +
+        $"Events are kept for {_settings.Current.EventRetentionDays} day(s), then cleaned up automatically.";
 
     public string LivenessPosture =>
         "Liveness is a non-functional placeholder. It detects NO presentation attacks " +
         "and must not be treated as verification.";
 
     public string Limitations =>
-        "• Windows is NOT unlocked, locked, or otherwise modified by this application.\n" +
+        "• SECURITY.EXE does not replace Windows authentication — Windows is NOT unlocked, locked, or otherwise modified by this application.\n" +
         "• Recognition quality depends on lighting, camera, and pose.\n" +
         "• One enrolled profile only.\n" +
-        "• Unknown-face snapshots are OFF by default; enabling them stores images on disk.\n" +
+        "• Unknown-face snapshots are OFF by default; enabling them stores images on disk (retention-limited).\n" +
+        "• Camera capture pauses whenever Windows locks; nothing is recorded on the lock screen.\n" +
         "• Thresholds are starting defaults — calibrate before relying on verdicts.\n" +
         "• Not certified for access control or compliance use.";
 
@@ -78,9 +80,10 @@ public sealed class AboutViewModel : ViewModelBase
     public string PrivacyStatement =>
         "Everything runs on this machine: there are no cloud calls and no external biometric " +
         "APIs. Face templates are encrypted with Windows DPAPI (CurrentUser) before they reach " +
-        "disk, and raw camera frames are never written to disk or to logs. No password, PIN, or " +
+        "disk, and raw camera frames are never written to logs. No password, PIN, or " +
         "credential is ever stored. Security events record a timestamp and an outcome — never a " +
-        "biometric sample — and image snapshots are OFF by default.";
+        "biometric sample — and image snapshots are OFF by default (opt-in, local only, " +
+        "retention-limited). SECURITY.EXE does not replace Windows authentication.";
 
     public string OpenCvLine { get; } = "OpenCvSharp 4.13 · ONNX Runtime 1.30 · SQLite / EF Core 10";
 }

@@ -17,17 +17,20 @@ public sealed class SecurityEventService : ISecurityEventService
 {
     private readonly ISecurityEventRepository _repository;
     private readonly ISettingsService? _settings;
+    private readonly IWindowsSessionService? _session;
     private readonly ILogger<SecurityEventService>? _logger;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     public SecurityEventService(
         ISecurityEventRepository repository,
         ISettingsService? settings = null,
-        ILogger<SecurityEventService>? logger = null)
+        ILogger<SecurityEventService>? logger = null,
+        IWindowsSessionService? session = null)
     {
         _repository = repository;
         _settings = settings;
         _logger = logger;
+        _session = session;
     }
 
     public event EventHandler<SecurityEvent>? EventRecorded;
@@ -37,10 +40,19 @@ public sealed class SecurityEventService : ISecurityEventService
         SecurityEventResult result,
         string description,
         double? confidence = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        SessionState? sessionState = null,
+        string? snapshotPath = null)
     {
+        // Fill the session state from the live monitor when the caller did not
+        // pass one. Null (session monitoring off / not probed yet) is stored as
+        // null — never guessed.
+        var effectiveSession = sessionState ?? _session?.CurrentState;
+
         var securityEvent = Core.Services.SecurityEventFactory.Create(
-            eventType, result, description, confidence);
+            eventType, result, description, confidence,
+            sessionState: effectiveSession,
+            snapshotPath: snapshotPath);
 
         var storeEvents = _settings?.Current.StoreSecurityEvents ?? true;
 

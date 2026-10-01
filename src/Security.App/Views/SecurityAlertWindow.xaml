@@ -1,0 +1,65 @@
+<Window x:Class="Security.App.Views.SecurityAlertWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SECURITY.EXE"
+        Width="380"
+        SizeToContent="Height"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        WindowStartupLocation="Manual"
+        Background="{StaticResource Brush.Background}">
+    <!--
+      Phase 3 unknown-face alert (spec §10-§12).
+
+      Shown by App only in the NORMAL desktop session, only while background
+      monitoring is active, unlocked, and only when the notification cooldown
+      allows it. Wording is fixed and neutral — "Unknown person detected.",
+      never "Intruder" and never a verdict about intent. It is a plain desktop
+      window: it never renders on the Windows lock screen or Secure Desktop.
+    -->
+    <Border BorderBrush="{StaticResource Brush.Danger}"
+            BorderThickness="1"
+            CornerRadius="9"
+            Padding="16">
+        <StackPanel>
+            <DockPanel>
+                <TextBlock Text="&#xE711;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="13"
+                           Foreground="{StaticResource Brush.Danger}"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="Unknown person detected"
+                           FontWeight="Bold"
+                           FontSize="13"
+                           Foreground="{StaticResource Brush.Danger}"
+                           Margin="8,0,0,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Time}"
+                           Style="{StaticResource Text.Muted}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+
+            <TextBlock Text="{Binding Message}"
+                       Style="{StaticResource Text.Secondary}"
+                       TextWrapping="Wrap"
+                       Margin="0,9,0,0" />
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,14,0,0">
+                <Button Content="Dismiss"
+                        Command="{Binding DismissCommand}"
+                        IsCancel="True"
+                        Style="{StaticResource Button.Ghost}" />
+                <Button Content="Open events"
+                        Command="{Binding OpenEventsCommand}"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource Button.Secondary}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

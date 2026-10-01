@@ -71,6 +71,16 @@ public class SecurityEventConfiguration : IEntityTypeConfiguration<SecurityEvent
             .HasMaxLength(512)
             .IsRequired();
 
+        // Phase 3: nullable additions — pre-Phase-3 rows carry NULL rather
+        // than a guessed value. Both are metadata only (a state name and a
+        // local relative file path); no credentials, no embeddings.
+        builder.Property(x => x.SessionState)
+            .HasConversion<string>()
+            .HasMaxLength(24);
+
+        builder.Property(x => x.SnapshotPath)
+            .HasMaxLength(260);
+
         builder.Property(x => x.Timestamp);
 
         builder.HasIndex(x => x.Timestamp);

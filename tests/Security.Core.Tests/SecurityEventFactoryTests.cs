@@ -91,6 +91,12 @@ public class SecurityEventFactoryTests
             nameof(SecurityEvent.Confidence),
             nameof(SecurityEvent.Timestamp),
             nameof(SecurityEvent.Description),
+
+            // Phase 3 additions — both metadata, never biometric payload:
+            // the session state at record time and a *relative* path to a
+            // locally stored snapshot file.
+            nameof(SecurityEvent.SessionState),
+            nameof(SecurityEvent.SnapshotPath),
         };
 
         var actual = typeof(SecurityEvent)

@@ -24,10 +24,21 @@ public static class InfrastructureServiceCollectionExtensions
         // Windows DPAPI, scoped to the current user.
         services.AddSingleton<IDataProtectionService, DataProtectionService>();
         services.AddSingleton<ISettingsService, SettingsService>();
+
+        // Windows session observation (SystemEvents + WTS). Reads state only —
+        // never hooks winlogon, never touches credentials.
+        services.AddSingleton<IWindowsSessionService, WindowsSessionService>();
+
+        // SecurityEventService resolves the session service optionally to stamp
+        // SessionState on every recorded event.
         services.AddSingleton<ISecurityEventService, SecurityEventService>();
+
+        services.AddSingleton<IHealthMonitor, HealthMonitor>();
+
+        // Retention sweeps: delete only expired events + expired snapshots.
+        // Logs its summary to the app log — never writes new event rows.
+        services.AddSingleton<IRetentionService, RetentionService>();
 
         return services;
     }
 }
-
-// probe 1790757372

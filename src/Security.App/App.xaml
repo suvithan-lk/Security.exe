@@ -20,6 +20,7 @@
             <converters:UtcToLocalConverter x:Key="UtcToLocal" />
             <converters:ConfidenceConverter x:Key="Confidence" />
             <converters:EventResultToBrushConverter x:Key="EventResultToBrush" />
+            <converters:SessionStateConverter x:Key="SessionState" />
             <converters:ZeroToVisibilityConverter x:Key="ZeroToVisibility" />
             <converters:BoolToTextConverter x:Key="ProfileState"
                                             TrueText="ENROLLED"
@@ -31,7 +32,7 @@
                                             TrueText="RUNNING"
                                             FalseText="STOPPED" />
 
-            <!-- Shared event row: time · type · result · confidence · description -->
+            <!-- Shared event row: time · type · result · confidence · session · description -->
             <DataTemplate x:Key="Template.EventRow">
                 <Grid Margin="0,7" VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
@@ -39,6 +40,7 @@
                         <ColumnDefinition Width="132" />
                         <ColumnDefinition Width="76" />
                         <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="104" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0"
@@ -57,6 +59,10 @@
                                Style="{StaticResource Text.Mono}"
                                Foreground="{StaticResource Brush.TextSecondary}" />
                     <TextBlock Grid.Column="4"
+                               Text="{Binding SessionState, Converter={StaticResource SessionState}}"
+                               Style="{StaticResource Text.Mono}"
+                               Foreground="{StaticResource Brush.TextSecondary}" />
+                    <TextBlock Grid.Column="5"
                                Text="{Binding Description}"
                                Style="{StaticResource Text.Secondary}"
                                TextTrimming="CharacterEllipsis"
@@ -71,13 +77,15 @@
                         <ColumnDefinition Width="132" />
                         <ColumnDefinition Width="76" />
                         <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="104" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="TIME" Style="{StaticResource Text.Label}" />
                     <TextBlock Grid.Column="1" Text="EVENT" Style="{StaticResource Text.Label}" />
                     <TextBlock Grid.Column="2" Text="RESULT" Style="{StaticResource Text.Label}" />
                     <TextBlock Grid.Column="3" Text="CONF." Style="{StaticResource Text.Label}" />
-                    <TextBlock Grid.Column="4" Text="DESCRIPTION" Style="{StaticResource Text.Label}" Margin="10,0,0,0" />
+                    <TextBlock Grid.Column="4" Text="SESSION" Style="{StaticResource Text.Label}" />
+                    <TextBlock Grid.Column="5" Text="DESCRIPTION" Style="{StaticResource Text.Label}" Margin="10,0,0,0" />
                 </Grid>
             </DataTemplate>
 

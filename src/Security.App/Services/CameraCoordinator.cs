@@ -65,6 +65,8 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
     private EnrollmentResult? _lastEnrollmentResult;
 
     private CameraState _state = CameraState.Offline;
+    private bool _keepRunning;
+    private bool _sessionPaused;
     private IReadOnlyList<string> _failureReasons = Array.Empty<string>();
     private int _sourceWidth;
     private int _sourceHeight;
@@ -153,6 +155,7 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(IsConnecting));
                 OnPropertyChanged(nameof(IsOffline));
                 OnPropertyChanged(nameof(IsError));
+                OnPropertyChanged(nameof(IsPaused));
                 OnPropertyChanged(nameof(StatusBadgeText));
             }
         }
@@ -166,12 +169,47 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
 
     public bool IsError => State == CameraState.Error;
 
-    /// <summary>Short badge caption: LIVE / CONNECTING / OFFLINE / ERROR.</summary>
+    /// <summary>True while the camera is held off because Windows locked the session.</summary>
+    public bool IsPaused => State == CameraState.Paused;
+
+    /// <summary>
+    /// Operator intent to keep the camera running. Set true by any successful
+    /// or attempted Start, cleared only by an explicit Stop (the UI's Stop
+    /// button or application exit) — never by a session pause or a
+    /// settings-driven stop.
+    ///
+    /// The background monitor uses this to decide whether an unlock (or a
+    /// re-enabled setting) may resume capture: a camera the operator switched
+    /// off stays off, while one merely paused for a locked session comes back.
+    /// </summary>
+    public bool KeepRunning
+    {
+        get => _keepRunning;
+        private set
+        {
+            if (SetProperty(ref _keepRunning, value))
+                RaiseCommandStatesChanged();
+        }
+    }
+
+    /// <summary>
+    /// True between <see cref="PauseForSessionAsync"/> and
+    /// <see cref="ResumeFromSessionAsync"/> — i.e. the monitor paused the
+    /// camera for a locked session and it has not been given back yet.
+    /// </summary>
+    public bool SessionPaused
+    {
+        get => _sessionPaused;
+        private set => SetProperty(ref _sessionPaused, value);
+    }
+
+    /// <summary>Short badge caption: LIVE / CONNECTING / PAUSED / OFFLINE / ERROR.</summary>
     public string StatusBadgeText => State switch
     {
         CameraState.Live => "LIVE",
         CameraState.Connecting => "CONNECTING",
         CameraState.Error => "ERROR",
+        CameraState.Paused => "PAUSED",
         _ => "OFFLINE",
     };
 
@@ -383,7 +421,7 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
                     "Connect a camera, then choose Refresh.",
                 ];
             }
-            else if (!IsRunning && State != CameraState.Error)
+            else if (!IsRunning && State is not (CameraState.Error or CameraState.Paused))
             {
                 State = CameraState.Offline;
                 CameraStatus = "Camera ready";
@@ -407,10 +445,37 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Serialize lifecycle transitions. Phase 2 only ever called these from
+    /// the UI thread; Phase 3's background monitor calls them from its own
+    /// loop, so a lock-event stop racing a retry start must not interleave
+    /// into a double-open.
+    /// </summary>
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        if (IsRunning)
-            return;
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            // A start (operator or monitor) expresses intent to keep the
+            // camera running; only an explicit Stop clears it.
+            KeepRunning = true;
+            SessionPaused = false;
+
+            if (IsRunning)
+                return;
+
+            await StartCoreAsync(cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task StartCoreAsync(CancellationToken cancellationToken)
+    {
 
         // Tracks whether the device is already open, so a later failure never
         // leaves the camera held while the UI believes it is stopped.
@@ -548,6 +613,108 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            // An explicit stop is an operator decision: the camera must stay
+            // off across lock/unlock until something starts it again.
+            KeepRunning = false;
+            SessionPaused = false;
+
+            await StopCoreAsync(cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Stop capture because Windows locked the session (spec §5). Always
+    /// stops — there is no setting that keeps the camera alive on a locked
+    /// desktop, and no UI is ever shown on the Secure Desktop.
+    ///
+    /// Unlike <see cref="StopAsync"/> this keeps <see cref="KeepRunning"/>,
+    /// so an unlock can resume exactly what was running before. Recording
+    /// stays as a plain CameraStopped event with a locked-session reason.
+    /// </summary>
+    public async Task PauseForSessionAsync(CancellationToken cancellationToken = default)
+    {
+        await _lifecycleGate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        try
+        {
+            SessionPaused = true;
+
+            if (!IsRunning && State != CameraState.Connecting)
+                return;
+
+            await StopCoreAsync(cancellationToken, "Camera stopped: Windows session locked.").ConfigureAwait(true);
+
+            // StopCoreAsync lands on Offline; the badge must say PAUSED so the
+            // dashboard never claims the operator switched the camera off.
+            State = CameraState.Paused;
+            CameraStatus = "Camera paused";
+            StatusText = "Camera monitoring is paused while Windows is locked.";
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Undo <see cref="PauseForSessionAsync"/> after an unlock. Capture comes
+    /// back only when all three hold: the camera was running (or was being
+    /// started) before the pause, background monitoring is on, and camera
+    /// monitoring while unlocked is on. A camera the operator stopped stays
+    /// stopped; a start that had failed before the lock is retried fresh.
+    /// </summary>
+    public async Task ResumeFromSessionAsync(CancellationToken cancellationToken = default)
+    {
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            var settings = _settings.Current;
+            var mayResume = SessionPaused
+                            && KeepRunning
+                            && settings.BackgroundMonitoring
+                            && settings.MonitorCameraWhenUnlocked;
+
+            SessionPaused = false;
+
+            if (!mayResume)
+            {
+                if (State == CameraState.Paused)
+                {
+                    State = CameraState.Offline;
+                    CameraStatus = "Camera stopped";
+                    StatusText = settings.MonitorCameraWhenUnlocked
+                        ? "Camera is off."
+                        : "Camera monitoring is disabled in Settings.";
+                }
+
+                return;
+            }
+
+            if (IsRunning)
+                return;
+
+            await StartCoreAsync(cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    /// <summary>Shared stop body: detach the pipeline, close the device, reset status.</summary>
+    /// <param name="reason">
+    /// Event description for a stop that actually ended capture. A session
+    /// pause passes its own wording so the event log never claims the operator
+    /// stopped the camera when Windows locked the session.
+    /// </param>
+    private async Task StopCoreAsync(CancellationToken cancellationToken, string? reason = null)
+    {
         try
         {
             _processor.Detach();
@@ -577,7 +744,7 @@ public sealed class CameraCoordinator : ObservableObject, IDisposable
                 await _events.RecordAsync(
                     Core.Enums.SecurityEventType.CameraStopped,
                     Core.Enums.SecurityEventResult.Info,
-                    "Camera stopped.").ConfigureAwait(true);
+                    string.IsNullOrWhiteSpace(reason) ? "Camera stopped." : reason).ConfigureAwait(true);
             }
         }
         catch (OperationCanceledException)

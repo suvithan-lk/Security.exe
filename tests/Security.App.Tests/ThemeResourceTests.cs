@@ -105,6 +105,8 @@ public class ThemeResourceTests
     [InlineData("Views/EventsView.xaml")]
     [InlineData("Views/SettingsView.xaml")]
     [InlineData("Views/AboutView.xaml")]
+    [InlineData("Views/EventDetailsWindow.xaml")]
+    [InlineData("Views/SecurityAlertWindow.xaml")]
     public void A_view_never_asks_for_a_resource_that_does_not_exist(string relative)
     {
         var root = AppPaths.RepositoryRootDirectory!;

@@ -41,6 +41,14 @@ public interface ISecurityEventRepository
 
     Task<int> CountAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Delete events strictly older than <paramref name="cutoffUtc"/> and
+    /// return the removed rows (so retention can also clean up their
+    /// snapshot files). Retention uses this — never a full table clear —
+    /// so live events are untouched.
+    /// </summary>
+    Task<IReadOnlyList<SecurityEvent>> DeleteOlderThanAsync(DateTime cutoffUtc, CancellationToken cancellationToken = default);
+
     Task ClearAsync(CancellationToken cancellationToken = default);
 }
 

@@ -44,4 +44,13 @@ public sealed class RecognitionOptions
 
     /// <summary>Frames a face must be seen in a row before we trust it (stability).</summary>
     public int StableFaceFrames { get; set; } = 3;
+
+    /// <summary>
+    /// Minimum seconds between UnknownFaceDetected events/alerts for the same
+    /// ongoing detection (spec §10). Recognition verdicts still run on the
+    /// shorter <see cref="RecognitionCooldownSeconds"/>; this only throttles
+    /// the security EVENT so a person standing in front of the camera does not
+    /// generate hundreds of identical rows. Default 30.
+    /// </summary>
+    public int UnknownFaceCooldownSeconds { get; set; } = 30;
 }

@@ -35,6 +35,88 @@
                        Margin="0,0,0,10"
                        Visibility="{Binding SavedMessage, Converter={StaticResource StringToVisibility}}" />
 
+            <!-- ==================== MONITORING (spec §6) ==================== -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="MONITORING" Style="{StaticResource Text.Label}" />
+
+                    <CheckBox Content="Background monitoring"
+                              IsChecked="{Binding BackgroundMonitoring}"
+                              Margin="0,12,0,0"
+                              Style="{StaticResource Input.CheckBox}" />
+                    <TextBlock Text="Master switch for the background service: session observation, camera policy, event recording and retention. Turning it off stops monitoring until you turn it back on."
+                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
+
+                    <CheckBox Content="Monitor Windows session"
+                              IsChecked="{Binding SessionMonitoring}"
+                              Margin="0,12,0,0"
+                              Style="{StaticResource Input.CheckBox}" />
+                    <TextBlock Text="Record SessionLocked, SessionUnlocked, logon and logoff events using supported Windows APIs. Never reads credentials and never shows UI on the lock screen."
+                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
+
+                    <CheckBox Content="Monitor camera when unlocked"
+                              IsChecked="{Binding MonitorCameraWhenUnlocked}"
+                              Margin="0,12,0,0"
+                              Style="{StaticResource Input.CheckBox}" />
+                    <TextBlock Text="Run the camera while you are signed in and unlocked. It always stops when Windows locks — no frames are captured on the lock screen."
+                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
+
+                    <CheckBox Content="Unknown face detection"
+                              IsChecked="{Binding UnknownFaceDetection}"
+                              Margin="0,12,0,0"
+                              Style="{StaticResource Input.CheckBox}" />
+                    <TextBlock Text="Create an &quot;Unknown person detected&quot; event when a face does not match your enrolled profile. Events are rate-limited by a cooldown in Recognition."
+                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
+
+                    <CheckBox Content="Desktop notifications"
+                              IsChecked="{Binding DesktopNotifications}"
+                              Margin="0,12,0,0"
+                              Style="{StaticResource Input.CheckBox}" />
+                    <TextBlock Text="Show a tray balloon when an unknown person is detected. Notifications never appear on the lock screen or Secure Desktop."
+                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
+
+                    <Separator Style="{StaticResource Divider}" />
+
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="250" />
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Notification cooldown -->
+                        <TextBlock Grid.Row="0" Text="Notification cooldown (s)" Style="{StaticResource Text.Body}" VerticalAlignment="Center" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource Input.Text}"
+                                 Text="{Binding NotificationCooldownSeconds, UpdateSourceTrigger=LostFocus}" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding NotificationCooldownNote}"
+                                   Style="{StaticResource Text.Muted}" Margin="14,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+
+                        <!-- Event retention -->
+                        <TextBlock Grid.Row="1" Text="Keep events for (days)" Style="{StaticResource Text.Body}" VerticalAlignment="Center" Margin="0,13,0,0" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource Input.Text}" Margin="0,13,0,0"
+                                 Text="{Binding EventRetentionDays, UpdateSourceTrigger=LostFocus}" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding EventRetentionNote}"
+                                   Style="{StaticResource Text.Muted}" Margin="14,13,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+
+                        <!-- Snapshot retention -->
+                        <TextBlock Grid.Row="2" Text="Keep snapshots for (days)" Style="{StaticResource Text.Body}" VerticalAlignment="Center" Margin="0,13,0,0" />
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  ItemsSource="{Binding SnapshotRetentionOptions}"
+                                  SelectedItem="{Binding SnapshotRetentionDays, Mode=TwoWay}"
+                                  Margin="0,13,0,0"
+                                  Style="{StaticResource Input.ComboBox}"
+                                  ItemContainerStyle="{StaticResource Input.ComboBox.Item}" />
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding SnapshotRetentionNote}"
+                                   Style="{StaticResource Text.Muted}" Margin="14,13,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- ==================== CAMERA ==================== -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                 <StackPanel>
@@ -173,9 +255,26 @@
                               IsChecked="{Binding StoreSnapshots}"
                               Margin="0,12,0,0"
                               Style="{StaticResource Input.CheckBox}" />
-                    <TextBlock Text="OFF by default. Snapshot capture is not implemented — no camera frame is ever written to disk."
-                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0"
-                               Foreground="{StaticResource Brush.Warning}" TextWrapping="Wrap" />
+                    <TextBlock Text="OFF by default. When enabled, one frame is saved to the local data/events folder for each unknown-face event — never uploaded — and deleted automatically by the retention period below."
+                               Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
+
+                    <Separator Style="{StaticResource Divider}" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Brush.Success}" />
+                        <TextBlock Text="Everything stays on this device — no cloud calls, no external biometric APIs."
+                                   Style="{StaticResource Text.Secondary}" Margin="9,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Brush.Success}" />
+                        <TextBlock Text="No passwords, PINs or Windows credentials are ever captured or stored."
+                                   Style="{StaticResource Text.Secondary}" Margin="9,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Brush.Success}" />
+                        <TextBlock Text="Events, snapshots and retention are all local files you can delete at any time."
+                                   Style="{StaticResource Text.Secondary}" Margin="9,0,0,0" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
@@ -196,7 +295,7 @@
                               IsEnabled="{Binding TrayAvailable}"
                               Margin="0,12,0,0"
                               Style="{StaticResource Input.CheckBox}" />
-                    <TextBlock Text="Disabled — requires a shell notification icon, which is not implemented yet."
+                    <TextBlock Text="ON by default: closing the window hides it to the notification area and monitoring continues. Use Exit on the tray menu to really quit. Turn this off to restore exit-on-close."
                                Style="{StaticResource Text.Muted}" Margin="27,4,0,0" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -255,10 +354,32 @@
                 </StackPanel>
             </Border>
 
+            <!-- ==================== ABOUT ==================== -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Open About"
+                                Command="{Binding GoToAboutCommand}"
+                                Style="{StaticResource Button.Ghost}" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="ABOUT" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding VersionLine}"
+                                   Style="{StaticResource Text.Body}"
+                                   Margin="0,8,0,0" />
+                        <TextBlock Text="Local face security with background monitoring. Full capability list, privacy posture and limitations are on the About page."
+                                   Style="{StaticResource Text.Muted}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
             <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap">
-                This application does not unlock, lock, or otherwise modify Windows. Thresholds are
-                starting defaults and must be calibrated against your own camera and model before any
-                verdict should be relied upon.
+                SECURITY.EXE does not replace Windows authentication and does not unlock, lock, or
+                otherwise modify Windows. All processing, notifications and storage stay on this
+                machine. Thresholds are starting defaults and must be calibrated against your own
+                camera and model before any verdict should be relied upon.
             </TextBlock>
 
         </StackPanel>

@@ -140,6 +140,11 @@ public sealed class SettingsService : ISettingsService
     /// Clamp a persisted <see cref="AppSettings"/> so a hand-edited row (or a
     /// value written by a future version) cannot request an impossible capture
     /// size and make the camera silently fail to open.
+    ///
+    /// Phase 3 retention/cooldown fields are clamped to their documented value
+    /// sets: a retention of 0 or 9999 days is never valid (0 would mean
+    /// "delete immediately", 9999 "never clean up" — the UI only offers
+    /// 1/3/7/14/30 days, so a bogus value snaps to the default instead).
     /// </summary>
     private static AppSettings SanitizeApp(AppSettings settings)
     {
@@ -147,6 +152,29 @@ public sealed class SettingsService : ISettingsService
         // whatever the device actually accepts.
         settings.CameraWidth = Math.Clamp(settings.CameraWidth, 160, 3840);
         settings.CameraHeight = Math.Clamp(settings.CameraHeight, 120, 2160);
+
+        settings.NotificationCooldownSeconds = Math.Clamp(settings.NotificationCooldownSeconds, 0, 3600);
+        settings.CameraRetryIntervalSeconds = Math.Clamp(settings.CameraRetryIntervalSeconds, 5, 3600);
+
+        settings.SnapshotRetentionDays = settings.SnapshotRetentionDays is 1 or 3 or 7 or 14 or 30
+            ? settings.SnapshotRetentionDays
+            : 7;
+
+        settings.EventRetentionDays = Math.Clamp(settings.EventRetentionDays, 1, 3650);
+
+        // The one-time Phase 3 migration: MinimizeToTray was never exposed to
+        // the operator before (TrayAvailable was hard-coded false), so a value
+        // of 0 is "a Phase 2 database", not an operator choice. Bump it to the
+        // Phase 3 default exactly once; SettingsVersion then never matches
+        // again, so an operator who turns the toggle off keeps it off.
+        if (settings.SettingsVersion < 1)
+        {
+            settings.MinimizeToTray = true;
+            settings.SettingsVersion = 1;
+        }
+
+        settings.SettingsVersion = Math.Clamp(settings.SettingsVersion, 1, 1_000_000);
+
         return settings;
     }
 
@@ -162,6 +190,7 @@ public sealed class SettingsService : ISettingsService
         options.EnrollmentSampleCount = Math.Clamp(options.EnrollmentSampleCount, 5, 100);
         options.MinimumFaceRatio = Math.Clamp(options.MinimumFaceRatio, 0.01, 1.0);
         options.StableFaceFrames = Math.Clamp(options.StableFaceFrames, 1, 30);
+        options.UnknownFaceCooldownSeconds = Math.Clamp(options.UnknownFaceCooldownSeconds, 0, 3600);
 
         if (options.MaximumBrightness <= options.MinimumBrightness)
             options.MaximumBrightness = options.MinimumBrightness + 1;
@@ -192,6 +221,18 @@ public sealed class SettingsService : ISettingsService
         StoreSecurityEvents = source.StoreSecurityEvents,
         StartWithWindows = source.StartWithWindows,
         MinimizeToTray = source.MinimizeToTray,
+        // Phase 3: every monitoring field must round-trip. A field missing from
+        // this list silently reverts to its default on the next save.
+        BackgroundMonitoring = source.BackgroundMonitoring,
+        SessionMonitoring = source.SessionMonitoring,
+        MonitorCameraWhenUnlocked = source.MonitorCameraWhenUnlocked,
+        UnknownFaceDetection = source.UnknownFaceDetection,
+        DesktopNotifications = source.DesktopNotifications,
+        NotificationCooldownSeconds = source.NotificationCooldownSeconds,
+        SnapshotRetentionDays = source.SnapshotRetentionDays,
+        EventRetentionDays = source.EventRetentionDays,
+        CameraRetryIntervalSeconds = source.CameraRetryIntervalSeconds,
+        SettingsVersion = source.SettingsVersion,
         SelectedCamera = source.SelectedCamera,
         CameraWidth = source.CameraWidth,
         CameraHeight = source.CameraHeight,
@@ -209,6 +250,7 @@ public sealed class SettingsService : ISettingsService
         EnrollmentSampleCount = source.EnrollmentSampleCount,
         MinimumFaceRatio = source.MinimumFaceRatio,
         StableFaceFrames = source.StableFaceFrames,
+        UnknownFaceCooldownSeconds = source.UnknownFaceCooldownSeconds,
     };
 
     private const string AppSettingsKey = "app.settings.v1";

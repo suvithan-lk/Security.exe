@@ -1,6 +1,50 @@
 <UserControl x:Class="Security.App.Views.EventsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <!-- Rows must stretch to the full table width; the default ListBoxItem
+             template would shrink-wrap them and clip the description column. -->
+        <Style x:Key="Event.Row" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#16202C" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Brush.NavActive}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Event.Table" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource Event.Row}" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -12,6 +56,10 @@
             <DockPanel Margin="0,0,0,12">
                 <TextBlock Text="Security Events" Style="{StaticResource Text.Title}" />
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="View details"
+                            Command="{Binding ShowDetailsCommand}"
+                            Style="{StaticResource Button.Secondary}"
+                            Margin="8,0,0,0" />
                     <Button Content="Clear log"
                             Command="{Binding ClearCommand}"
                             Style="{StaticResource Button.Danger}"
@@ -28,12 +76,43 @@
                             <TextBlock Text="EVENT TYPE" Style="{StaticResource Text.Label}" />
                             <ComboBox ItemsSource="{Binding TypeFilters}"
                                       SelectedItem="{Binding SelectedType, Mode=TwoWay}"
-                                      Width="210"
+                                      Width="190"
                                       Margin="0,7,0,0"
                                       Style="{StaticResource Input.ComboBox}"
                                       ItemContainerStyle="{StaticResource Input.ComboBox.Item}" />
                         </StackPanel>
 
+                        <StackPanel Margin="0,0,18,0">
+                            <TextBlock Text="RESULT" Style="{StaticResource Text.Label}" />
+                            <ComboBox ItemsSource="{Binding ResultFilters}"
+                                      SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
+                                      Width="150"
+                                      Margin="0,7,0,0"
+                                      Style="{StaticResource Input.ComboBox}"
+                                      ItemContainerStyle="{StaticResource Input.ComboBox.Item}" />
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,18,0">
+                            <TextBlock Text="SESSION" Style="{StaticResource Text.Label}" />
+                            <ComboBox ItemsSource="{Binding SessionFilters}"
+                                      SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
+                                      Width="160"
+                                      Margin="0,7,0,0"
+                                      Style="{StaticResource Input.ComboBox}"
+                                      ItemContainerStyle="{StaticResource Input.ComboBox.Item}" />
+                        </StackPanel>
+
+                        <StackPanel>
+                            <TextBlock Text="DESCRIPTION" Style="{StaticResource Text.Label}" />
+                            <TextBox Width="220"
+                                     Margin="0,7,0,0"
+                                     Style="{StaticResource Input.Text}"
+                                     Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Case-insensitive text search over the description column" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <StackPanel Margin="0,0,18,0">
                             <TextBlock Text="FROM" Style="{StaticResource Text.Label}" />
                             <DatePicker SelectedDate="{Binding FromDate, Mode=TwoWay}"
@@ -85,17 +164,24 @@
                 <Separator Grid.Row="0" Style="{StaticResource Divider}" VerticalAlignment="Bottom" Margin="0" />
 
                 <Grid Grid.Row="1">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Events}"
-                                      ItemTemplate="{StaticResource Template.EventRow}" />
-                    </ScrollViewer>
+                    <!-- Selectable rows: click selects, double-click (or the
+                         toolbar's View details button) opens the dialog. -->
+                    <ListBox ItemsSource="{Binding Events}"
+                             SelectedItem="{Binding SelectedEvent, Mode=TwoWay}"
+                             ItemTemplate="{StaticResource Template.EventRow}"
+                             Style="{StaticResource Event.Table}"
+                             VirtualizingPanel.IsVirtualizing="False">
+                        <ListBox.InputBindings>
+                            <MouseBinding MouseAction="LeftDoubleClick"
+                                          Command="{Binding ShowDetailsCommand}" />
+                        </ListBox.InputBindings>
+                    </ListBox>
 
                     <TextBlock Text="No events to display."
                                Style="{StaticResource Text.Secondary}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
+                               IsHitTestVisible="False"
                                Visibility="{Binding Events.Count, Converter={StaticResource ZeroToVisibility}}" />
                 </Grid>
             </Grid>

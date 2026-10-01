@@ -88,12 +88,14 @@
                 <StackPanel>
                     <TextBlock Text="PHASE STATUS" Style="{StaticResource Text.Label}" />
                     <TextBlock Style="{StaticResource Text.Body}" Margin="0,10,0,0" TextWrapping="Wrap">
-                        <Run Text="Phase 2 does not unlock Windows. " FontWeight="Bold" Foreground="{StaticResource Brush.Warning}" />
-                        <Run Text="This release adds a reliable camera lifecycle (start / stop / restart), " />
-                        <Run Text="a five-step enrollment wizard, live frame-quality guidance, a real per-sample " />
-                        <Run Text="cooldown, recognition with a configurable threshold and cooldown, and a " />
-                        <Run Text="styled control system across every page. " />
-                        <Run Text="Real liveness detection, multiple profiles, and tray behaviour remain planned." />
+                        <Run Text="SECURITY.EXE does not replace Windows authentication. " FontWeight="Bold" Foreground="{StaticResource Brush.Warning}" />
+                        <Run Text="Phase 3 adds background monitoring (session lock/unlock/logon/logoff), " />
+                        <Run Text="camera pause on lock and resume on unlock, a notification-area tray with " />
+                        <Run Text="pause / resume and close-to-tray, desktop notifications with cooldowns, " />
+                        <Run Text="optional unknown-face snapshots with retention, event retention cleanup, " />
+                        <Run Text="system health reporting, single-instance activation, and an expanded " />
+                        <Run Text="Dashboard / Events / Settings experience. " />
+                        <Run Text="Real liveness detection and multiple profiles remain planned." />
                     </TextBlock>
                 </StackPanel>
             </Border>

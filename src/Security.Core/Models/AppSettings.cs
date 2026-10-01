@@ -22,7 +22,63 @@ public sealed class AppSettings
     // --- Application ---
     public bool StartWithWindows { get; set; }
 
-    public bool MinimizeToTray { get; set; }
+    /// <summary>
+    /// Phase 3 default is ON: closing the window hides it to the tray so
+    /// background monitoring continues. Setting it off restores Phase 2's
+    /// exit-on-close behaviour.
+    /// </summary>
+    public bool MinimizeToTray { get; set; } = true;
+
+    // --- Monitoring (Phase 3) ---
+
+    /// <summary>Master switch for the background monitor. Default ON.</summary>
+    public bool BackgroundMonitoring { get; set; } = true;
+
+    /// <summary>Observe Windows session state (lock/unlock/logon/logoff). Default ON.</summary>
+    public bool SessionMonitoring { get; set; } = true;
+
+    /// <summary>
+    /// Run the camera while the session is unlocked (pause on lock, resume on
+    /// unlock). Default ON. Never runs on the Secure Desktop.
+    /// </summary>
+    public bool MonitorCameraWhenUnlocked { get; set; } = true;
+
+    /// <summary>Create UnknownFaceDetected events while unlocked. Default ON.</summary>
+    public bool UnknownFaceDetection { get; set; } = true;
+
+    /// <summary>Show desktop (tray balloon) notifications. Default ON.</summary>
+    public bool DesktopNotifications { get; set; } = true;
+
+    /// <summary>
+    /// Minimum seconds between desktop notifications for the same condition.
+    /// Default 30 (spec §26).
+    /// </summary>
+    public int NotificationCooldownSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Days to keep event snapshots on disk before automatic cleanup.
+    /// Allowed: 1, 3, 7, 14, 30 (spec §14). Default 7.
+    /// </summary>
+    public int SnapshotRetentionDays { get; set; } = 7;
+
+    /// <summary>
+    /// Days to keep security event records before automatic cleanup.
+    /// Default 30 (spec §33). Recent events are never deleted.
+    /// </summary>
+    public int EventRetentionDays { get; set; } = 30;
+
+    /// <summary>
+    /// Seconds to wait before retrying a failed camera start in the
+    /// background (spec §30/§32). Default 30.
+    /// </summary>
+    public int CameraRetryIntervalSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// One-time migration marker. 0 = a database written before Phase 3.
+    /// Used only to apply Phase 3 defaults (e.g. MinimizeToTray) exactly once;
+    /// it never deletes or rewrites existing user data.
+    /// </summary>
+    public int SettingsVersion { get; set; }
 
     // --- Camera ---
     public string? SelectedCamera { get; set; }

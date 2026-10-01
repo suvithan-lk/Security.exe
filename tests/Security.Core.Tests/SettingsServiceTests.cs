@@ -58,7 +58,7 @@ public class SettingsServiceTests
         Assert.True(service.Current.RecognitionEnabled);
         Assert.False(service.Current.LivenessCheckEnabled);
         Assert.False(service.Current.StartWithWindows);
-        Assert.False(service.Current.MinimizeToTray);
+        Assert.True(service.Current.MinimizeToTray);   // Phase 3: close-to-tray ON by default
         Assert.Equal(0.60, service.Recognition.Threshold, 6);
     }
 

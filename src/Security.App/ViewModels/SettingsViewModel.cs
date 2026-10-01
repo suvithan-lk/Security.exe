@@ -21,6 +21,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private readonly IUserDialogService _dialogs;
     private readonly IToastService _toasts;
     private readonly ISecurityEventService _events;
+    private readonly INavigationService _navigation;
     private readonly CameraOptions _cameraOptions;
     private readonly ILogger<SettingsViewModel>? _logger;
 
@@ -35,6 +36,7 @@ public sealed class SettingsViewModel : ViewModelBase
         IUserDialogService dialogs,
         IToastService toasts,
         ISecurityEventService events,
+        INavigationService navigation,
         CameraOptions cameraOptions,
         ILogger<SettingsViewModel>? logger = null)
     {
@@ -43,6 +45,7 @@ public sealed class SettingsViewModel : ViewModelBase
         _dialogs = dialogs;
         _toasts = toasts;
         _events = events;
+        _navigation = navigation;
         _cameraOptions = cameraOptions;
         _logger = logger;
 
@@ -53,6 +56,7 @@ public sealed class SettingsViewModel : ViewModelBase
         ResetCommand = new RelayCommand(Reset);
         RefreshCamerasCommand = new AsyncRelayCommand(RefreshCamerasAsync);
         ClearEventsCommand = new AsyncRelayCommand(ClearEventsAsync);
+        GoToAboutCommand = new RelayCommand(() => _navigation.NavigateTo("about"));
 
         _settings.SettingsChanged += OnSettingsChanged;
     }
@@ -177,6 +181,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
             _app.StoreSnapshots = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SnapshotRetentionNote));
         }
     }
 
@@ -219,8 +224,148 @@ public sealed class SettingsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Tray behaviour needs a shell notification icon — still planned.</summary>
-    public bool TrayAvailable => false;
+    /// <summary>
+    /// Phase 3: the notification-area icon exists, so the close-to-tray
+    /// option is actionable (it used to be disabled while still planned).
+    /// </summary>
+    public bool TrayAvailable => true;
+
+    #endregion
+
+    #region Bindings — monitoring (Phase 3, spec §6)
+
+    /// <summary>Master switch. Off = no background monitoring at all.</summary>
+    public bool BackgroundMonitoring
+    {
+        get => _app.BackgroundMonitoring;
+        set
+        {
+            if (_app.BackgroundMonitoring == value)
+                return;
+
+            _app.BackgroundMonitoring = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Record lock/unlock/logon/logoff session events.</summary>
+    public bool SessionMonitoring
+    {
+        get => _app.SessionMonitoring;
+        set
+        {
+            if (_app.SessionMonitoring == value)
+                return;
+
+            _app.SessionMonitoring = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Run the camera while unlocked; always pause it on lock.</summary>
+    public bool MonitorCameraWhenUnlocked
+    {
+        get => _app.MonitorCameraWhenUnlocked;
+        set
+        {
+            if (_app.MonitorCameraWhenUnlocked == value)
+                return;
+
+            _app.MonitorCameraWhenUnlocked = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Create UnknownFaceDetected events while unlocked.</summary>
+    public bool UnknownFaceDetection
+    {
+        get => _app.UnknownFaceDetection;
+        set
+        {
+            if (_app.UnknownFaceDetection == value)
+                return;
+
+            _app.UnknownFaceDetection = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Tray balloon / desktop notification for unknown faces.</summary>
+    public bool DesktopNotifications
+    {
+        get => _app.DesktopNotifications;
+        set
+        {
+            if (_app.DesktopNotifications == value)
+                return;
+
+            _app.DesktopNotifications = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Seconds between desktop notifications for the same condition.</summary>
+    public int NotificationCooldownSeconds
+    {
+        get => _app.NotificationCooldownSeconds;
+        set
+        {
+            var clamped = Math.Clamp(value, 0, 3600);
+            if (_app.NotificationCooldownSeconds == clamped)
+                return;
+
+            _app.NotificationCooldownSeconds = clamped;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(NotificationCooldownNote));
+        }
+    }
+
+    public string NotificationCooldownNote =>
+        $"Currently {_app.NotificationCooldownSeconds} s between notifications (0 = every occurrence).";
+
+    /// <summary>Allowed snapshot retention periods (spec §14).</summary>
+    public IReadOnlyList<int> SnapshotRetentionOptions { get; } = [1, 3, 7, 14, 30];
+
+    public int SnapshotRetentionDays
+    {
+        get => _app.SnapshotRetentionDays;
+        set
+        {
+            var clamped = AllowedSnapshotRetention.Contains(value) ? value : 7;
+            if (_app.SnapshotRetentionDays == clamped)
+                return;
+
+            _app.SnapshotRetentionDays = clamped;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SnapshotRetentionNote));
+        }
+    }
+
+    public string SnapshotRetentionNote =>
+        _app.StoreSnapshots
+            ? $"Snapshot files older than {_app.SnapshotRetentionDays} day{(_app.SnapshotRetentionDays == 1 ? "" : "s")} are deleted automatically."
+            : "Snapshots are off — no files are written.";
+
+    /// <summary>Days to keep event records before automatic cleanup (spec §33).</summary>
+    public int EventRetentionDays
+    {
+        get => _app.EventRetentionDays;
+        set
+        {
+            var clamped = Math.Clamp(value, 1, 3650);
+            if (_app.EventRetentionDays == clamped)
+                return;
+
+            _app.EventRetentionDays = clamped;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(EventRetentionNote));
+        }
+    }
+
+    public string EventRetentionNote =>
+        $"Security events older than {_app.EventRetentionDays} day{(_app.EventRetentionDays == 1 ? "" : "s")} are deleted automatically, together with their snapshots.";
+
+    private static readonly HashSet<int> AllowedSnapshotRetention = [1, 3, 7, 14, 30];
 
     #endregion
 
@@ -390,6 +535,11 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public ICommand ResetCommand { get; }
 
+    public ICommand GoToAboutCommand { get; }
+
+    /// <summary>Matches the About page: "Version 0.3.0 — Phase 3".</summary>
+    public string VersionLine => $"Version {VersionInfo.Version} — {VersionInfo.Phase}";
+
     public override async Task OnNavigatedAsync()
     {
         // Pull the latest persisted values in case another screen changed them.
@@ -494,6 +644,17 @@ public sealed class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(StoreSecurityEvents));
         OnPropertyChanged(nameof(StartWithWindows));
         OnPropertyChanged(nameof(MinimizeToTray));
+        OnPropertyChanged(nameof(BackgroundMonitoring));
+        OnPropertyChanged(nameof(SessionMonitoring));
+        OnPropertyChanged(nameof(MonitorCameraWhenUnlocked));
+        OnPropertyChanged(nameof(UnknownFaceDetection));
+        OnPropertyChanged(nameof(DesktopNotifications));
+        OnPropertyChanged(nameof(NotificationCooldownSeconds));
+        OnPropertyChanged(nameof(NotificationCooldownNote));
+        OnPropertyChanged(nameof(SnapshotRetentionDays));
+        OnPropertyChanged(nameof(SnapshotRetentionNote));
+        OnPropertyChanged(nameof(EventRetentionDays));
+        OnPropertyChanged(nameof(EventRetentionNote));
         OnPropertyChanged(nameof(CameraResolutions));
         OnPropertyChanged(nameof(CameraResolution));
         OnPropertyChanged(nameof(CameraResolutionNote));
@@ -509,6 +670,18 @@ public sealed class SettingsViewModel : ViewModelBase
         StoreSecurityEvents = source.StoreSecurityEvents,
         StartWithWindows = source.StartWithWindows,
         MinimizeToTray = source.MinimizeToTray,
+        // Phase 3 monitoring block — must round-trip or a Save from this
+        // screen would silently reset every background-monitoring toggle.
+        BackgroundMonitoring = source.BackgroundMonitoring,
+        SessionMonitoring = source.SessionMonitoring,
+        MonitorCameraWhenUnlocked = source.MonitorCameraWhenUnlocked,
+        UnknownFaceDetection = source.UnknownFaceDetection,
+        DesktopNotifications = source.DesktopNotifications,
+        NotificationCooldownSeconds = source.NotificationCooldownSeconds,
+        SnapshotRetentionDays = source.SnapshotRetentionDays,
+        EventRetentionDays = source.EventRetentionDays,
+        CameraRetryIntervalSeconds = source.CameraRetryIntervalSeconds,
+        SettingsVersion = source.SettingsVersion,
         SelectedCamera = source.SelectedCamera,
         CameraWidth = source.CameraWidth,
         CameraHeight = source.CameraHeight,
@@ -526,5 +699,6 @@ public sealed class SettingsViewModel : ViewModelBase
         EnrollmentSampleCount = source.EnrollmentSampleCount,
         MinimumFaceRatio = source.MinimumFaceRatio,
         StableFaceFrames = source.StableFaceFrames,
+        UnknownFaceCooldownSeconds = source.UnknownFaceCooldownSeconds,
     };
 }

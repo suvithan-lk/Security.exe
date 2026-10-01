@@ -1,11 +1,12 @@
-# SECURITY.EXE — Phase 2
+# SECURITY.EXE — Phase 3
 
 A local-only Windows desktop security application: camera preview with live status
 and failure diagnostics, face detection, a five-step face enrollment wizard,
-DPAPI-encrypted face embeddings, and face recognition — all running entirely on your
-machine.
+DPAPI-encrypted face embeddings, face recognition, and **background monitoring** —
+session observation, camera pause on lock, a tray icon, desktop notifications, and
+retention — all running entirely on your machine.
 
-**Phase 2 does not unlock Windows.**
+**SECURITY.EXE does not replace Windows authentication.**
 
 This release is a standalone application with its own local database. It does not
 interact with Windows sign-in, `winlogon`, the lock screen, the Secure Desktop, or any
@@ -15,7 +16,7 @@ authentication.
 
 - **Product:** Security
 - **Executable:** `Security.exe` (assembly name `Security`)
-- **Version:** 0.2.0 — Phase 2
+- **Version:** 0.3.0 — Phase 3
 - **Stack:** C# · .NET 10 · WPF · MVVM · OpenCvSharp · ONNX Runtime · SQLite · EF Core 10
 
 ---
@@ -23,8 +24,9 @@ authentication.
 ## Table of contents
 
 1. [Overview](#overview)
-2. [What's new in Phase 2](#whats-new-in-phase-2)
-3. [Features](#features)
+2. [What's new in Phase 3](#whats-new-in-phase-3)
+3. [What's new in Phase 2](#whats-new-in-phase-2)
+4. [Features](#features)
 4. [Architecture](#architecture)
 5. [Tech stack](#tech-stack)
 6. [Requirements](#requirements)
@@ -53,8 +55,64 @@ public ONNX models described below.
 
 On first launch you will see a dark security dashboard with a sidebar — a **SECURITY**
 group containing **Dashboard, Face Profile, Camera, Events, Settings, About** — and
-status cards for *System ready*, *Face profile*, *Camera*, *Recognition engine*, and
-*Last detection*, followed by recent events.
+status cards for *Windows session*, *Camera*, *Face profile*, *Recognition*,
+*Monitoring* and *Last event*, followed by the security timeline, system health and
+recent events.
+
+## What's new in Phase 3
+
+Phase 3 turns SECURITY.EXE into a background personal-security monitor without
+rebuilding anything that already worked: all Phase 1/2 functionality is preserved.
+
+**Background monitoring**
+
+- `SecurityMonitorService` (a .NET `BackgroundService`) coordinates the session
+  observer, the camera lifecycle, event recording, notifications, health reporting and
+  retention — all `CancellationToken`-driven, with a clean stop on exit.
+- `IWindowsSessionService` records **SessionLocked / SessionUnlocked / SessionLogon /
+  SessionLogoff / SessionConnected / SessionDisconnected** using supported Windows APIs
+  only (`SystemEvents.SessionSwitch` + a WTS lock-state probe). Unknown state stays
+  *Unknown* — never guessed as *Unlocked*.
+- **Camera policy:** locking Windows **always** stops the camera; unlocking resumes it
+  only when camera monitoring is enabled. No start/stop churn; a failed start is
+  retried after `CameraRetryIntervalSeconds`.
+
+**Tray and notifications**
+
+- A notification-area icon (WinForms `NotifyIcon`) with **Open Security, Pause /
+  Resume Monitoring, Open Events, Settings, Exit** and an honest status line
+  (`MONITORING ACTIVE / PAUSED / OFF`) mirroring the monitor verbatim.
+- **X minimises to tray** (default ON), **Exit** performs a full shutdown, and a
+  **single-instance mutex** makes a second copy activate the first instead of opening
+  a second DB/camera session.
+- Desktop notifications: a tray balloon plus a desktop alert window, both gated by a
+  30-second notification cooldown, both **never** shown on the lock screen or Secure
+  Desktop. Wording is fixed and neutral: *Unknown person detected.*
+
+**Snapshots and retention**
+
+- Unknown-face snapshots are **OFF by default**; when enabled, one frame per cooldown
+  window is written to `data/events/` under a generated filename and shown from the
+  new **Event Details** dialog.
+- `SnapshotRetentionDays` (1/3/7/14/30, default 7) and `EventRetentionDays`
+  (default 30) clean up expired files and rows automatically; cleanup summaries go to
+  the application log, never the event table.
+
+**Health and UI**
+
+- `IHealthMonitor` reports **Healthy / Degraded / Unavailable** for Database, Camera,
+  Recognition engine, Background service and Notifications — concrete faults only,
+  never "system compromised".
+- Dashboard: a `SYSTEM STATUS` banner, the six status cards, an icon-based **security
+  timeline** and a **system health** panel.
+- Events: result/session filters, description search, a **SESSION** column and an
+  **Event Details** dialog (all fields + snapshot, or *No snapshot stored.*).
+- Settings: a **MONITORING** section (background monitoring, session monitoring,
+  camera-when-unlocked, unknown-face detection, desktop notifications — all default
+  **ON**), notification cooldown, retention rows, and privacy statements.
+- The database gained `SessionState` and `SnapshotPath` columns via additive
+  migration `20261001070910_Phase3SessionAndSnapshot` (the pre-migration DB was
+  backed up first).
 
 ## What's new in Phase 2
 
@@ -145,22 +203,34 @@ camera, enrollment, and recognition experience.
 **Events**
 - ApplicationStarted / ApplicationStopped, CameraStarted / CameraStopped / CameraError,
   EnrollmentStarted / EnrollmentCompleted / EnrollmentFailed, FaceDetected,
-  KnownFaceDetected, UnknownFaceDetected, RecognitionFailed, SettingChanged, EventsCleared.
-- Events screen with timestamp, event, result, confidence and description; filter by
-  type and date range; clear-all behind a confirmation dialog.
+  KnownFaceDetected, UnknownFaceDetected, RecognitionFailed, SettingChanged,
+  EventsCleared — plus Phase 3: SessionLocked / SessionUnlocked / SessionLogon /
+  SessionLogoff / SessionConnected / SessionDisconnected, MonitoringStarted /
+  MonitoringStopped / MonitoringPaused / MonitoringResumed, NotificationSent,
+  SnapshotCaptured, SnapshotDeleted.
+- Events screen with timestamp, event, result, confidence, **session state** and
+  description; filters by type, date range, result and session, a description search,
+  clear-all behind a confirmation dialog, and an **Event Details** dialog showing every
+  field plus the stored snapshot (or *No snapshot stored.*).
 - Event rows never contain biometric data.
 
 **Unknown face**
-- An in-app alert banner inside the main window, dismissed manually.
-- A `UnknownFaceDetected` security event is recorded; storing an image snapshot is
-  **off** by default and is not implemented.
-- It is deliberately **not** shown on the Windows Secure Desktop or the lock screen.
+- An in-app alert banner inside the main window, a tray balloon, and a desktop alert
+  window — each gated by the 30-second notification cooldown, wording fixed and
+  neutral: *Unknown person detected.*
+- A `UnknownFaceDetected` security event is recorded (gated by its own 30-second
+  cooldown); an image snapshot is stored only when **Store snapshots** is explicitly
+  enabled (default **OFF**), under a generated filename in `data/events/`.
+- Deliberately **not** shown on the Windows Secure Desktop or the lock screen — the
+  alert window opens only in the normal desktop session, and the camera (and with it
+  all capture) stops whenever Windows locks.
 
 **Notifications**
 - App-level toasts in the bottom-right of the main window: auto-dismiss after six
   seconds (twelve for errors), manually closable, at most four visible at once.
-- Rendered inside `MainWindow` only — never on the Windows Secure Desktop, lock
-  screen, or Action Center.
+- Tray balloon tips (click restores the window) when **Desktop notifications** is on.
+- Rendered inside `MainWindow` / the notification area only — never on the Windows
+  Secure Desktop, lock screen, or Action Center.
 
 **Interface**
 - Every default WPF control is replaced by a themed style from `DarkTheme.xaml`.
@@ -188,10 +258,11 @@ security/
 │   │                           liveness, frame pipeline, model locator
 │   └── Security.App/           WPF shell: views, view models, converters, styles
 └── tests/
-    ├── Security.App.Tests/     24 tests — camera state machine + XAML/theme guard
-    ├── Security.Core.Tests/   109 tests
+    ├── Security.App.Tests/     61 tests — camera state machine, tray/single-instance,
+    │                           monitor lifecycle, XAML/theme guard
+    ├── Security.Core.Tests/   120 tests
     ├── Security.Face.Tests/    54 tests
-    └── Security.Data.Tests/    27 tests
+    └── Security.Data.Tests/    33 tests
 ```
 
 **Layering rule:** business logic lives in `Security.*`. The WPF project holds views,
@@ -213,6 +284,10 @@ but `InitializeComponent()`.
 | `IDataProtectionService` | encrypt/decrypt before storage |
 | `ISettingsService` | `appsettings.json` defaults + DB overrides |
 | `ISecurityEventService` | persist and mirror events |
+| `IWindowsSessionService` | observe lock/unlock/logon/logoff/connect/disconnect |
+| `IHealthMonitor` | per-component Healthy / Degraded / Unavailable reporting |
+| `IRetentionService` | age out expired events and their snapshot files |
+| `ISnapshotStore` | write / delete one-frame snapshots under `data/events/` |
 | `IToastService` | in-app, non-blocking notifications |
 
 **UI flow:** `App.xaml.cs` builds a Generic Host (Microsoft.Extensions DI + Serilog),
@@ -235,7 +310,7 @@ camera thread ──► single-slot buffer (older frames dropped)
                      │
                      ├─► overlay (bounding box + status) on the UI thread
                      ├─► security event (no biometric payload)
-                     └─► in-app alert banner on first Unknown
+                     └─► unknown-face alert (30 s cooldown → banner/balloon/desktop)
 ```
 
 ## Tech stack
@@ -304,7 +379,7 @@ Other useful commands:
 
 ```powershell
 dotnet build                                   # build everything
-dotnet test                                    # run all 214 tests
+dotnet test                                    # run all 268 tests
 dotnet run -c Release --project src/Security.App
 
 # headless diagnosis harness: exercises the real DI wiring against the real
@@ -317,7 +392,9 @@ dotnet ef database update   --project src/Security.Data --startup-project src/Se
 ```
 
 On first run the app creates `data/security.db` and applies the `InitialCreate`
-migration. Application logs go to `logs/security-YYYYMMDD.log` (14 days retained).
+migration, then the additive Phase 3 migration
+`20261001070910_Phase3SessionAndSnapshot` (session state + snapshot path columns).
+Application logs go to `logs/security-YYYYMMDD.log` (14 days retained).
 
 > **Where files land:** `data/`, `logs/`, and `models/` are resolved from the repository
 > root by walking up from the executable looking for `Security.slnx`. In a published
@@ -431,18 +508,19 @@ the enrollment sample count.
 
 ## Database structure
 
-`data/security.db` (SQLite, created by EF Core migration `20260930061313_InitialCreate`):
+`data/security.db` (SQLite, created by EF Core migrations `20260930061313_InitialCreate`
+and `20261001070910_Phase3SessionAndSnapshot`):
 
 | Table | Purpose | Personal data |
 | --- | --- | --- |
 | `UserProfiles` | the single active local profile (display name, timestamps) | display name only |
 | `FaceEmbeddings` | DPAPI-protected payload, model version, sample count | encrypted biometric, never plaintext |
-| `SecurityEvents` | event type, result, confidence, timestamp, description | none — no biometric payload |
+| `SecurityEvents` | event type, result, confidence, timestamp, description, session state, snapshot path | none — no biometric payload; an optional snapshot *path* (the file itself lives in `data/events/`) |
 | `ApplicationSettings` | key/value overrides on top of `appsettings.json` | none |
 
-Phase 1 supports exactly **one** active profile. Only the data the feature actually
-needs is stored — no photographs, no frames, no contact details, no identifiers beyond
-the local profile row.
+The app supports exactly **one** active profile. Only the data the feature actually
+needs is stored — no photographs (unless opt-in snapshots are enabled), no frames in
+the database, no contact details, no identifiers beyond the local profile row.
 
 ## Security model
 
@@ -453,7 +531,9 @@ the local profile row.
   (`AesDataProtectionService`) exists behind the same interface for portability and is
   covered by round-trip tests.
 - **What is stored:** an encrypted 128-float vector, the model version, and a sample
-  count. **No raw images are stored**, and snapshots are **off** by default.
+  count. **No raw images are stored in the database**, snapshots are **off** by
+  default, and any opt-in snapshot file is a single frame under `data/events/` with an
+  automatic retention window.
 - **Logging:** embeddings, raw frames, and encrypted payloads are never written to the
   log, and exceptions surfaced to the UI never carry them. The log template destructures
   only the fields the caller passes.
@@ -465,17 +545,44 @@ the local profile row.
   `winlogon`, or credential providers.
 - **Camera access is visible:** the device is opened only by an explicit user action
   and released on stop, switch, error, and exit.
-- **Alerting:** unknown faces produce an in-app banner only — never a system-level or
-  Secure Desktop prompt.
+- **Alerting:** unknown faces produce an in-app banner, a tray balloon, and a desktop
+  alert window — all gated by a 30-second notification cooldown, all inside the normal
+  desktop session only. Never a system-level or Secure Desktop prompt.
+
+**Background monitoring & tray**
+- `SecurityMonitorService` (a .NET `BackgroundService`) observes the Windows session,
+  applies the camera policy (lock always stops capture; unlock resumes it when enabled),
+  records session and monitoring events, fires notifications, refreshes health and runs
+  retention — all `CancellationToken`-driven.
+- Session events: SessionLocked / SessionUnlocked / SessionLogon / SessionLogoff /
+  SessionConnected / SessionDisconnected, recorded as **Info** using supported Windows
+  APIs only.
+- A notification-area tray icon with **Open Security · Pause/Resume Monitoring · Open
+  Events · Settings · Exit** and an honest status line (`MONITORING ACTIVE / PAUSED /
+  OFF`). Closing the window minimises to the tray (default ON); **Exit** performs a
+  full shutdown; a single-instance mutex makes a second copy activate the first.
+- **Snapshots** (opt-in, default OFF): one frame per unknown-face cooldown window is
+  written to `data/events/` under a generated filename, linked from the Event Details
+  dialog, and deleted by `SnapshotRetentionDays` (1/3/7/14/30, default 7).
+- **Retention:** events older than `EventRetentionDays` (default 30) and their expired
+  snapshot files are cleaned up automatically; the cleanup summary goes to the
+  application log, never the event table.
+- **Health:** Database, Camera, Recognition engine, Background service and
+  Notifications each report Healthy / Degraded / Unavailable with a concrete detail.
 
 ## Privacy model
 
 - Everything runs locally; there is no account, cloud service, or telemetry.
 - Biometric data is minimized to one encrypted embedding per enrolled profile.
-- **Store snapshots:** OFF by default (never enables itself).
-- **Store security events:** ON by default — events contain metadata only.
+- **Store snapshots:** OFF by default (never enables itself). When explicitly enabled,
+  frames stay on disk only until `SnapshotRetentionDays` expires.
+- **Store security events:** ON by default — events contain metadata only, and expire
+  after `EventRetentionDays`.
+- Snapshots never appear on the Windows lock screen or Secure Desktop; the camera is
+  stopped whenever Windows locks.
 - The Events screen lets you clear the log at any time (with confirmation).
-- Deleting `data/security.db` removes the profile, the embedding, and the history.
+- Deleting `data/security.db` removes the profile, the embedding, and the history;
+  deleting `data/events/` removes snapshots.
 
 ## Configuration
 
@@ -500,10 +607,20 @@ into `ApplicationSettings`.
   "Settings": {
     "RecognitionEnabled": true,
     "LivenessCheckEnabled": false,
-    "StoreSnapshots": false,           // privacy default
+    "StoreSnapshots": false,           // privacy default; frames go to data/events/
     "StoreSecurityEvents": true,
     "StartWithWindows": false,         // HKCU Run key only
-    "MinimizeToTray": false,           // persisted but disabled — no tray icon yet
+    "MinimizeToTray": true,            // X hides to the tray; Exit is on the tray menu
+    "BackgroundMonitoring": true,      // Phase 3 §6 — monitor the session + camera
+    "SessionMonitoring": true,         // record lock/unlock/logon/logoff events
+    "MonitorCameraWhenUnlocked": true, // lock always stops the camera
+    "UnknownFaceDetection": true,      // unknown-face events + cooldown
+    "DesktopNotifications": true,      // tray balloon + desktop alert window
+    "NotificationCooldownSeconds": 30, // gates balloon + toast + alert window
+    "UnknownFaceCooldownSeconds": 30,  // gates unknown-face event + snapshot + alert
+    "CameraRetryIntervalSeconds": 60,  // retry a failed auto-start
+    "SnapshotRetentionDays": 7,        // {1,3,7,14,30}
+    "EventRetentionDays": 30,          // 1–3650
     "CameraWidth": 1280,               // capture size, applied on the next start
     "CameraHeight": 720
   },
@@ -525,14 +642,14 @@ time a device is opened.
 dotnet test
 ```
 
-**214 tests, all passing** (0 warnings):
+**268 tests, all passing** (0 warnings):
 
 | Project | Tests | Covers |
 | --- | --- | --- |
-| `Security.Core.Tests` | 109 | threshold/decision logic, profile validation, event factory, DPAPI + AES encryption round-trips, settings load/save/sanitize (including capture-size persistence and clamping), primary-face selection and the shared person-counting rule, path resolution |
+| `Security.Core.Tests` | 120 | threshold/decision logic, profile validation, event factory (including the Phase 3 session/monitoring/snapshot event types), DPAPI + AES encryption round-trips, settings load/save/sanitize/migration (capture-size persistence, clamping, `MinimizeToTray` migration), primary-face selection and the shared person-counting rule, WTS lock-state struct layout regression, path resolution |
 | `Security.Face.Tests` | 54 | face alignment math, static quality gates, the live `IFaceQualityService` gate (face count, detector noise, centring, guidance vocabulary), liveness placeholder, frame-pipeline attach/detach lifecycle |
-| `Security.App.Tests` | 24 | camera state machine (no camera, enumeration failure, refused start → ERROR, permission denial, stop, restart, badge transitions) **plus a XAML guard** that parses `DarkTheme.xaml` the way WPF does and checks every view's resource references — so a broken theme fails CI instead of throwing on every layout pass at runtime |
-| `Security.Data.Tests` | 27 | UserProfile / FaceEmbedding / SecurityEvent / ApplicationSetting repositories against a real temp SQLite file |
+| `Security.App.Tests` | 61 | camera state machine (no camera, enumeration failure, refused start → ERROR, permission denial, stop, restart, badge transitions), **monitor lifecycle** (start/stop/pause/resume, session transitions, camera lock/unlock policy, unknown-face and notification cooldowns), **single-instance guard**, snapshot/event retention, health status, settings persistence, **plus a XAML guard** that parses `DarkTheme.xaml` the way WPF does and checks every view's resource references — so a broken theme fails CI instead of throwing on every layout pass at runtime |
+| `Security.Data.Tests` | 33 | UserProfile / FaceEmbedding / SecurityEvent / ApplicationSetting repositories against a real temp SQLite file, including `SessionState`/`SnapshotPath` persistence and `DeleteOlderThanAsync` |
 
 No test requires camera hardware — camera and model behaviour is behind interfaces, so
 the suites use fakes and a temporary database. The scenarios that genuinely need a
@@ -546,14 +663,20 @@ dotnet run --project tools/Security.Diag/Security.Diag.csproj
 
 ## Limitations
 
-- **Phase 2 does not unlock Windows.** No integration with sign-in, the lock screen, or
-  any credential provider. Nothing in this release changes Windows authentication,
-  `winlogon`, or any credential provider.
+- **SECURITY.EXE does not replace Windows authentication.** No integration with
+  sign-in, the lock screen, or any credential provider. Nothing in this release
+  changes Windows authentication, `winlogon`, or any credential provider, and the
+  app never locks or unlocks your machine.
 - **Single profile.** One enrolled identity; no multi-user support.
 - **Threshold not calibrated.** 0.60 is a documented starting point only.
 - **Liveness is a placeholder**, not production anti-spoofing.
-- **Snapshots are not implemented.** The setting exists and defaults to OFF, but no
-  code path writes a camera frame to disk, so turning it on does nothing.
+- **Session state can be Unknown.** The WTS probe reports what Windows actually
+  reports; when it cannot determine the lock state (or session monitoring is off) the
+  state stays *Unknown* — it is never guessed as *Unlocked*, so the camera is not
+  auto-started on a guess.
+- **Win+L lock/unlock transitions and the tray flows are manual tests.** They need a
+  real desktop session (a lock screen cannot be simulated by the unit suites), so they
+  are verified by hand with the app running.
 - **Detector noise is filtered, not eliminated.** A detection below half the
   configured minimum face size is ignored when deciding whether a second person is
   present. That is the right trade-off for enrollment (YuNet's stray ~15px blips were
@@ -596,20 +719,21 @@ dotnet run --project tools/Security.Diag/Security.Diag.csproj
   restored across restarts — Windows does not guarantee the same device index, so a
   stale selection could open the wrong camera. The first enumerated device is used
   instead.
-- Minimize-to-tray is persisted in settings but not yet implemented.
+- The diagnostic harness stops early when nobody is in front of the camera: the
+  hardware stages that need a visible face (detection, enrollment, recognition,
+  memory soak) report *skipped*, not *failed*. Sit in front of the camera and re-run
+  to exercise them.
 
 ## Roadmap
 
-**Phase 3 (not started)**
-- Minimize to tray, and a real tray menu.
+**Phase 4 (not started)**
 - Multi-profile support and profile management (rename, delete, re-enroll).
 - Threshold calibration tooling against a labelled set of your own captures.
 - Real anti-spoofing liveness (challenge-response and/or a dedicated anti-spoof model),
   replacing the placeholder.
-- Optional OS-level notifications for unknown faces, still never on the Secure
-  Desktop.
+- Optional Windows toast notifications (Action Center) for unknown faces, still never
+  on the Secure Desktop — Phase 3 ships tray balloons and a desktop alert window only.
 - Optional hardware signing / MSIX packaging to satisfy Smart App Control.
-- Snapshot capture, if ever enabled, with explicit retention and a visible indicator.
 
 **Explicitly out of scope for all phases**
 - Bypassing or modifying Windows authentication, `winlogon`, or credential providers.

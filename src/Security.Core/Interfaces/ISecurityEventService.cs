@@ -25,12 +25,20 @@ public interface ISecurityEventService
     Task ClearAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Record an event. Safe to call from any thread; never throws.</summary>
+    /// <param name="sessionState">
+    /// Windows session state at the time of the event. Null lets the service
+    /// fill in the session service's last known state (or leave it empty when
+    /// session monitoring has not produced one yet).
+    /// </param>
+    /// <param name="snapshotPath">Optional local snapshot path (relative, never a URL).</param>
     Task<SecurityEvent> RecordAsync(
         SecurityEventType eventType,
         SecurityEventResult result,
         string description,
         double? confidence = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        SessionState? sessionState = null,
+        string? snapshotPath = null);
 
     /// <summary>Raised after an event has been persisted (for live UI updates).</summary>
     event EventHandler<SecurityEvent>? EventRecorded;

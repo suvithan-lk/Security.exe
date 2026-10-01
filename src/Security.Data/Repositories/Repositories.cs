@@ -206,6 +206,25 @@ public class SecurityEventRepository : RepositoryBase, ISecurityEventRepository
     public Task<int> CountAsync(CancellationToken cancellationToken = default)
         => UseContextAsync(db => db.SecurityEvents.CountAsync(cancellationToken), cancellationToken);
 
+    public async Task<IReadOnlyList<SecurityEvent>> DeleteOlderThanAsync(
+        DateTime cutoffUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await UseContextAsync<IReadOnlyList<SecurityEvent>>(async db =>
+        {
+            var expired = await db.SecurityEvents
+                .Where(e => e.Timestamp < cutoffUtc)
+                .ToListAsync(cancellationToken);
+
+            if (expired.Count == 0)
+                return (IReadOnlyList<SecurityEvent>)Array.Empty<SecurityEvent>();
+
+            db.SecurityEvents.RemoveRange(expired);
+            await db.SaveChangesAsync(cancellationToken);
+            return expired;
+        }, cancellationToken);
+    }
+
     public async Task ClearAsync(CancellationToken cancellationToken = default)
     {
         await UseContextAsync(async db =>

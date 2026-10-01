@@ -1,23 +1,32 @@
-﻿using System.Text;
+﻿using System.ComponentModel;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace Security.App;
 
 /// <summary>
-/// Interaction logic for MainWindow.xaml
+/// Interaction logic for MainWindow.xaml.
+///
+/// Phase 3: X honours the close-to-tray setting — the window hides and the
+/// background monitor keeps running; the tray's Exit performs the real
+/// shutdown. When close-to-tray is off (or Exit was requested) the window
+/// closes normally.
 /// </summary>
 public partial class MainWindow : Window
 {
     public MainWindow()
     {
         InitializeComponent();
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (Application.Current is App app && app.ShouldMinimizeToTray())
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
+        base.OnClosing(e);
     }
 }

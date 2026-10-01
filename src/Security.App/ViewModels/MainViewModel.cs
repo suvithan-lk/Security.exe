@@ -28,12 +28,14 @@ public sealed class MainViewModel : ObservableObject
 {
     private readonly INavigationService _navigation;
     private readonly CameraCoordinator _coordinator;
+    private readonly SecurityMonitorService _monitor;
     private readonly IToastService _toasts;
 
     private NavItem? _selectedNav;
     private object _currentViewModel;
     private bool _suppressSelectionCallback;
     private bool _alertVisible;
+    private bool _cameraActive;
     private string _alertMessage = string.Empty;
     private string _alertTime = string.Empty;
 
@@ -46,10 +48,12 @@ public sealed class MainViewModel : ObservableObject
         AboutViewModel about,
         INavigationService navigation,
         CameraCoordinator coordinator,
+        SecurityMonitorService monitor,
         IToastService toasts)
     {
         _navigation = navigation;
         _coordinator = coordinator;
+        _monitor = monitor;
         _toasts = toasts;
 
         NavItems = new ObservableCollection<NavItem>
@@ -66,7 +70,12 @@ public sealed class MainViewModel : ObservableObject
         _selectedNav = NavItems[0];
 
         _navigation.Navigated += OnNavigated;
-        _coordinator.SecurityAlert += OnSecurityAlert;
+
+        // Alerts come from the monitor (cooldown- and session-gated), NOT raw
+        // camera detections — the banner must not re-fire on every frame.
+        _monitor.NotificationRequested += OnNotificationRequested;
+        _coordinator.PropertyChanged += OnCoordinatorPropertyChanged;
+        _cameraActive = _coordinator.IsRunning;
 
         DismissAlertCommand = new RelayCommand(DismissAlert);
     }
@@ -75,7 +84,8 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>
     /// In-app banner for an unknown face. Deliberately NOT a Windows Secure
-    /// Desktop or lock-screen notification — Phase 1 never interrupts Windows.
+    /// Desktop or lock-screen notification — Phase 3 never interrupts Windows.
+    /// Shown only when the background monitor's notification cooldown allows it.
     /// </summary>
     public bool AlertVisible
     {
@@ -95,23 +105,43 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _alertTime, value);
     }
 
+    /// <summary>
+    /// True only while the camera is actually capturing — drives the CAMERA
+    /// ACTIVE badge in the top bar. False while stopped or session-paused.
+    /// </summary>
+    public bool CameraActive
+    {
+        get => _cameraActive;
+        private set => SetProperty(ref _cameraActive, value);
+    }
+
     public System.Windows.Input.ICommand DismissAlertCommand { get; }
 
     /// <summary>Application toast stack, rendered by the shell.</summary>
     public IToastService Toasts => _toasts;
 
-    private void OnSecurityAlert(object? sender, SecurityAlertEventArgs e)
+    private void OnNotificationRequested(object? sender, SecurityAlertEventArgs e)
     {
         var alert = e.Result;
 
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
         {
+            // Fixed, neutral wording — never "intruder", never a verdict.
             AlertMessage =
-                $"An unrecognised face was detected (similarity {alert.Similarity:F2}). " +
+                $"Unknown person detected (similarity {alert.Similarity:F2}). " +
                 "This notification is shown inside the app only.";
             AlertTime = DateTime.Now.ToString("HH:mm:ss");
             AlertVisible = true;
         }));
+    }
+
+    private void OnCoordinatorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(CameraCoordinator.IsRunning))
+            return;
+
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+            CameraActive = _coordinator.IsRunning));
     }
 
     private void DismissAlert() => AlertVisible = false;

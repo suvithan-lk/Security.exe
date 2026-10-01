@@ -40,6 +40,19 @@ public interface IFrameProcessor : IDisposable
     bool RecognitionSuppressed { get; set; }
 
     /// <summary>
+    /// While false, an unknown verdict is still produced for the live overlay,
+    /// but no <c>UnknownFaceDetected</c> event is recorded, no snapshot is
+    /// taken and no security alert is raised.
+    ///
+    /// Owned by the background monitor, which recomputes it as
+    /// <c>UnknownFaceDetection &amp;&amp; BackgroundMonitoring &amp;&amp; !trayPaused</c>
+    /// whenever those settings change. Defaults to true so the pipeline behaves
+    /// exactly as it did before background monitoring existed when no monitor
+    /// is attached (e.g. unit tests).
+    /// </summary>
+    bool UnknownFaceDetectionEnabled { get; set; }
+
+    /// <summary>
     /// Optional sink invoked on the worker thread with each analysed frame,
     /// after detection. The Mat is valid only for the duration of the call.
     ///

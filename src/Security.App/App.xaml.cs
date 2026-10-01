@@ -29,12 +29,42 @@ public partial class App : Application
 {
     private IHost? _host;
     private CancellationTokenSource? _startupCts;
+    private SingleInstanceGuard? _instanceGuard;
+    private TrayIconService? _tray;
+    private MainWindow? _mainWindow;
+    private Views.SecurityAlertWindow? _alertWindow;
+
+    /// <summary>Set by the tray's Exit command so the close-to-tray rule lets the window really close.</summary>
+    private bool _exitRequested;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         InstallGlobalExceptionHandlers();
+
+        // 0. Single instance: the first copy owns the session; a second copy
+        //    asks it to come forward and quits before touching DB/camera/host.
+        _instanceGuard = new SingleInstanceGuard();
+        if (!_instanceGuard.IsPrimary)
+        {
+            try
+            {
+                _instanceGuard.SignalActivation();
+            }
+            catch (Exception)
+            {
+                // No primary listening — exiting anyway is still correct.
+            }
+
+            _instanceGuard.Dispose();
+            _instanceGuard = null;
+            Shutdown();
+            return;
+        }
+
+        _instanceGuard.ActivationRequested += (_, _) =>
+            Dispatcher.BeginInvoke(new Action(ShowMainWindow));
 
         _startupCts = new CancellationTokenSource();
         var token = _startupCts.Token;
@@ -70,7 +100,13 @@ public partial class App : Application
             //    acquisition can take a while on a cold start.
             var window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;
+            _mainWindow = window;
             window.Show();
+
+            // 3b. Notification-area icon (Phase 3). Menu commands route back
+            //     through the host's services; the status line mirrors the
+            //     monitor's own text verbatim.
+            InitializeTray(logger);
 
             // Kick the initial screen's refresh (engine status + recent events)
             // now that bindings are live. Runs in the background — startup must
@@ -78,6 +114,13 @@ public partial class App : Application
             _ = _host.Services.GetRequiredService<MainViewModel>().OnShellReadyAsync();
 
             _ = LoadEngineAsync(logger, token);
+
+            // 4. Start the generic host: this launches the background
+            //    monitoring loop (session observation, camera lifecycle,
+            //    health, retention). It yields immediately — camera auto-start
+            //    is deliberately delayed inside the monitor so it never races
+            //    the shell's first refresh above.
+            await _host.StartAsync(token);
 
             logger.LogInformation("SECURITY.EXE {Version} started", VersionInfo.Display);
         }
@@ -163,6 +206,176 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Create the tray icon and connect its menu to the host's services:
+    /// open/restore the window, pause/resume monitoring, navigate to Events
+    /// or Settings, and Exit (a real shutdown — camera stop, host stop,
+    /// ApplicationStopped). The status line mirrors
+    /// <c>MonitoringStatusText</c> verbatim on every monitor state change.
+    /// </summary>
+    private void InitializeTray(Microsoft.Extensions.Logging.ILogger logger)
+    {
+        try
+        {
+            var monitor = _host!.Services.GetRequiredService<SecurityMonitorService>();
+            var mainViewModel = _host.Services.GetRequiredService<MainViewModel>();
+            var settings = _host.Services.GetRequiredService<ISettingsService>();
+
+            var iconPath = System.IO.Path.Combine(
+                AppContext.BaseDirectory, "Resources", "security.ico");
+
+            _tray = new TrayIconService(iconPath);
+
+            _tray.Commands.OpenWindowRequested += (_, _) => ShowMainWindow();
+            _tray.Commands.OpenEventsRequested += (_, _) =>
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ShowMainWindow();
+                    mainViewModel.NavigateTo("events");
+                }));
+            _tray.Commands.OpenSettingsRequested += (_, _) =>
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ShowMainWindow();
+                    mainViewModel.NavigateTo("settings");
+                }));
+            _tray.Commands.ExitRequested += (_, _) => ExitFromTray();
+
+            _tray.Commands.PauseToggleRequested += async (_, pause) =>
+            {
+                try
+                {
+                    await monitor.SetMonitoringPausedAsync(pause);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Tray pause toggle failed");
+                }
+            };
+
+            // Status line + balloon notifications from the monitor.
+            monitor.StateChanged += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+                _tray?.UpdateStatus(monitor.MonitoringStatusText, monitor.IsPaused)));
+
+            monitor.NotificationRequested += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                // The monitor already applied the cooldown, the active-
+                // monitoring gate and the locked-session rule. Wording is
+                // fixed and neutral — "Unknown person detected.", never
+                // "Intruder".
+                if (settings.Current.DesktopNotifications)
+                    _tray?.ShowNotification("Security", "Unknown person detected.");
+
+                ShowSecurityAlertWindow(monitor);
+            }));
+
+            _tray.UpdateStatus(monitor.MonitoringStatusText, monitor.IsPaused);
+
+            logger.LogInformation("Tray icon ready");
+        }
+        catch (Exception ex)
+        {
+            // The app must work without a tray icon (e.g. icon load failure).
+            logger.LogWarning(ex, "Tray icon could not be created; continuing without it");
+        }
+    }
+
+    /// <summary>Restore the window from the tray, a second instance, or a balloon click.</summary>
+    private void ShowMainWindow()
+    {
+        if (_mainWindow is null)
+            return;
+
+        _mainWindow.Show();
+        if (_mainWindow.WindowState == WindowState.Minimized)
+            _mainWindow.WindowState = WindowState.Normal;
+
+        _mainWindow.Activate();
+        _mainWindow.Topmost = true;
+        _mainWindow.Topmost = false;
+    }
+
+    /// <summary>
+    /// Open the unknown-face alert window for this notification. Shown only in
+    /// the NORMAL desktop session — never on the lock screen or the Secure
+    /// Desktop — only while desktop notifications are enabled, and only when
+    /// the main window is not already on screen (the in-app banner covers
+    /// that case). One instance at a time: a newer notification replaces the
+    /// previous alert instead of stacking windows.
+    /// </summary>
+    private void ShowSecurityAlertWindow(SecurityMonitorService monitor)
+    {
+        // Defence in depth: the monitor already refuses to notify while the
+        // session is locked; re-check before any UI is created.
+        if (monitor.CurrentSessionState == SessionState.Locked)
+            return;
+
+        if (_host is null)
+            return;
+
+        try
+        {
+            var settings = _host.Services.GetRequiredService<ISettingsService>();
+            if (!settings.Current.DesktopNotifications)
+                return;
+
+            // Window visible = the in-app banner already carries the alert.
+            if (_mainWindow is { IsVisible: true } && _mainWindow.WindowState != WindowState.Minimized)
+                return;
+
+            var mainViewModel = _host.Services.GetRequiredService<MainViewModel>();
+            var window = new Views.SecurityAlertWindow();
+            window.OpenEventsRequested += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ShowMainWindow();
+                mainViewModel.NavigateTo("events");
+            }));
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_alertWindow, window))
+                    _alertWindow = null;
+            };
+
+            _alertWindow?.Close();
+            _alertWindow = window;
+            window.Show();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Security alert window could not be shown");
+        }
+    }
+
+    /// <summary>
+    /// Tray Exit: a full shutdown (not hide-to-tray). OnExit then stops the
+    /// camera, records ApplicationStopped, and stops the host.
+    /// </summary>
+    private void ExitFromTray()
+    {
+        _exitRequested = true;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// Called by MainWindow's Closing handler: with close-to-tray enabled, X
+    /// hides the window and keeps monitoring; otherwise (or when Exit was
+    /// requested) the close proceeds.
+    /// </summary>
+    public bool ShouldMinimizeToTray()
+    {
+        if (_exitRequested)
+            return false;
+
+        try
+        {
+            return _host?.Services.GetService<ISettingsService>()?.Current.MinimizeToTray ?? false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private static IHost BuildHost()
     {
         return Host.CreateDefaultBuilder()
@@ -215,6 +428,12 @@ public partial class App : Application
                 services.AddSingleton<IToastService, ToastService>();
                 services.AddSingleton<CameraCoordinator>();
 
+                // Background monitoring loop (Phase 3). Registered once and
+                // reused as the hosted service so the tray and dashboard can
+                // resolve the same instance.
+                services.AddSingleton<SecurityMonitorService>();
+                services.AddHostedService(sp => sp.GetRequiredService<SecurityMonitorService>());
+
                 services.AddSingleton<DashboardViewModel>();
                 services.AddSingleton<FaceProfileViewModel>();
                 services.AddSingleton<CameraViewModel>();
@@ -236,6 +455,28 @@ public partial class App : Application
         try
         {
             _startupCts?.Cancel();
+
+            // Tray first: no ghost icon left in the notification area.
+            try
+            {
+                _tray?.Dispose();
+                _tray = null;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Tray icon disposal failed");
+            }
+
+            // No orphan alert window left on screen after exit.
+            try
+            {
+                _alertWindow?.Close();
+                _alertWindow = null;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Security alert window disposal failed");
+            }
 
             if (_host is not null)
             {
@@ -271,6 +512,16 @@ public partial class App : Application
         }
         finally
         {
+            try
+            {
+                _instanceGuard?.Dispose();
+                _instanceGuard = null;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Instance guard disposal failed");
+            }
+
             Log.CloseAndFlush();
             _startupCts?.Dispose();
             base.OnExit(e);
@@ -282,10 +533,10 @@ public partial class App : Application
 public static class VersionInfo
 {
     public const string ProductName = "Security";
-    public const string Phase = "Phase 2";
+    public const string Phase = "Phase 3";
 
     public static string Version { get; } =
-        (typeof(VersionInfo).Assembly.GetName().Version ?? new Version(0, 2, 0)).ToString(3);
+        (typeof(VersionInfo).Assembly.GetName().Version ?? new Version(0, 3, 0)).ToString(3);
 
     public static string Display => $"{ProductName} {Version} ({Phase})";
 }

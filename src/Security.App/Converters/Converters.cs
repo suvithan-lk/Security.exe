@@ -231,3 +231,17 @@ public sealed class ZeroToVisibilityConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+/// <summary>
+/// Renders an event's nullable session state for the SESSION column:
+/// the short caption (LOCKED / UNLOCKED / …) when recorded, an em dash for
+/// events written before Phase 3. Null is never guessed as a real state.
+/// </summary>
+public sealed class SessionStateConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is SessionState state ? state.ToDisplayText() : "—";
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}

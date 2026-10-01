@@ -40,6 +40,7 @@ public sealed class FrameProcessor : IFrameProcessor
     private readonly object _slotLock = new();
     private readonly SemaphoreSlim _wake = new(0, 1);
     private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly ISnapshotStore? _snapshots;
 
     private ICameraService? _camera;
     private Mat? _pending;
@@ -60,7 +61,14 @@ public sealed class FrameProcessor : IFrameProcessor
     /// </summary>
     private long? _lastRecognitionMs;
 
-    private bool _lastAlertWasUnknown;
+    /// <summary>
+    /// Tick of the last recorded unknown-face event, or null if none yet.
+    /// Same null-sentinel pattern as <see cref="_lastRecognitionMs"/>: gating
+    /// the first unknown on "never seen one" instead of a subtraction that
+    /// could overflow.
+    /// </summary>
+    private long? _lastUnknownMs;
+
     private bool _disposed;
 
     public FrameProcessor(
@@ -69,7 +77,8 @@ public sealed class FrameProcessor : IFrameProcessor
         ISecurityEventService events,
         ISettingsService settings,
         ILogger<FrameProcessor>? logger = null,
-        IFaceQualityService? quality = null)
+        IFaceQualityService? quality = null,
+        ISnapshotStore? snapshots = null)
     {
         _detection = detection;
         _recognition = recognition;
@@ -77,6 +86,7 @@ public sealed class FrameProcessor : IFrameProcessor
         _settings = settings;
         _logger = logger;
         _quality = quality;
+        _snapshots = snapshots;
     }
 
     public event EventHandler<FrameAnalysisEventArgs>? FrameAnalyzed;
@@ -88,6 +98,8 @@ public sealed class FrameProcessor : IFrameProcessor
     public bool IsProcessing => _worker is { IsCompleted: false };
 
     public bool RecognitionSuppressed { get; set; }
+
+    public bool UnknownFaceDetectionEnabled { get; set; } = true;
 
     public Func<Mat, CancellationToken, Task>? FrameSink { get; set; }
 
@@ -101,7 +113,7 @@ public sealed class FrameProcessor : IFrameProcessor
         _camera = camera;
         _stableFrames = 0;
         _lastRecognitionMs = null;
-        _lastAlertWasUnknown = false;
+        _lastUnknownMs = null;
 
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
@@ -301,7 +313,7 @@ public sealed class FrameProcessor : IFrameProcessor
                     result = await _recognition.RecognizeAsync(frame, token).ConfigureAwait(false);
                     qualityMessage = Describe(result);
 
-                    await PublishAsync(result, token).ConfigureAwait(false);
+                    await PublishAsync(frame, result, nowMs, token).ConfigureAwait(false);
                 }
                 else
                 {
@@ -351,7 +363,7 @@ public sealed class FrameProcessor : IFrameProcessor
         }
     }
 
-    private async Task PublishAsync(FaceRecognitionResult result, CancellationToken token)
+    private async Task PublishAsync(Mat frame, FaceRecognitionResult result, long nowMs, CancellationToken token)
     {
         try
         {
@@ -365,26 +377,37 @@ public sealed class FrameProcessor : IFrameProcessor
         switch (result.Status)
         {
             case RecognitionStatus.Known:
-                _lastAlertWasUnknown = false;
                 await _events.RecordAsync(SecurityEventType.KnownFaceDetected, SecurityEventResult.Known,
                     "Face matched the enrolled profile.", result.Similarity, token).ConfigureAwait(false);
                 break;
 
             case RecognitionStatus.Unknown:
-                await _events.RecordAsync(SecurityEventType.UnknownFaceDetected, SecurityEventResult.Unknown,
-                    "Face did not match the enrolled profile.", result.Similarity, token).ConfigureAwait(false);
+                // Unknown detection is gated two ways: the operator/monitor
+                // switch (no event, no snapshot, no alert while off) and a
+                // dedicated cooldown so a face lingering in frame cannot write
+                // a row per recognition tick.
+                if (!UnknownFaceDetectionEnabled || !UnknownCooldownElapsed(nowMs))
+                    break;
 
-                if (!_lastAlertWasUnknown)
+                _lastUnknownMs = nowMs;
+
+                // Snapshot first: the event row then stores the path in a
+                // single write. A failed snapshot never blocks the event.
+                string? snapshotPath = null;
+                if (_settings.Current.StoreSnapshots)
+                    snapshotPath = _snapshots?.Save(frame, token);
+
+                await _events.RecordAsync(SecurityEventType.UnknownFaceDetected, SecurityEventResult.Unknown,
+                    "Face did not match the enrolled profile.", result.Similarity, token,
+                    snapshotPath: snapshotPath).ConfigureAwait(false);
+
+                try
                 {
-                    _lastAlertWasUnknown = true;
-                    try
-                    {
-                        UnknownFaceDetected?.Invoke(this, result);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "An UnknownFaceDetected subscriber threw");
-                    }
+                    UnknownFaceDetected?.Invoke(this, result);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "An UnknownFaceDetected subscriber threw");
                 }
 
                 break;
@@ -399,6 +422,18 @@ public sealed class FrameProcessor : IFrameProcessor
 
     private long CooldownMs()
         => Math.Max(0, _settings.Recognition.RecognitionCooldownSeconds) * 1000L;
+
+    private long UnknownCooldownMs()
+        => Math.Max(0, _settings.Recognition.UnknownFaceCooldownSeconds) * 1000L;
+
+    /// <summary>
+    /// True when no unknown event has been recorded yet, or when the
+    /// dedicated unknown-face cooldown has elapsed since the last one.
+    /// Null-check instead of subtraction — same overflow reasoning as
+    /// <see cref="CooldownElapsed"/>.
+    /// </summary>
+    private bool UnknownCooldownElapsed(long nowMs)
+        => _lastUnknownMs is not long last || nowMs - last >= UnknownCooldownMs();
 
     /// <summary>
     /// True when no verdict has been produced yet, or when the configured

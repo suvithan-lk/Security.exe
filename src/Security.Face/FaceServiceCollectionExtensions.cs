@@ -56,6 +56,11 @@ public static class FaceServiceCollectionExtensions
         services.AddSingleton<IFaceRecognitionService, FaceRecognitionService>();
         services.AddSingleton<IEnrollmentService, EnrollmentService>();
         services.AddSingleton<IFaceQualityService, FaceQualityService>();
+
+        // Local-only JPEG snapshots for unknown-face events (data/events/).
+        services.AddSingleton<ISnapshotStore>(sp => new Snapshots.SnapshotStore(
+            sp.GetService<ILogger<Snapshots.SnapshotStore>>()));
+
         services.AddSingleton<IFrameProcessor, FrameProcessor>();
 
         return services;

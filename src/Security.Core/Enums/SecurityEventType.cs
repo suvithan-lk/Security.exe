@@ -19,4 +19,23 @@ public enum SecurityEventType
     RecognitionFailed,
     SettingChanged,
     EventsCleared,
+
+    // --- Phase 3: Windows session monitoring ---
+    SessionLocked,
+    SessionUnlocked,
+    SessionLogon,
+    SessionLogoff,
+    SessionConnected,
+    SessionDisconnected,
+
+    // --- Phase 3: background monitoring lifecycle ---
+    MonitoringStarted,
+    MonitoringStopped,
+    MonitoringPaused,
+    MonitoringResumed,
+
+    // --- Phase 3: notifications and snapshots ---
+    NotificationSent,
+    SnapshotCaptured,
+    SnapshotDeleted,
 }

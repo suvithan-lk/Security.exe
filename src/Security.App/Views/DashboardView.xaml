@@ -20,51 +20,67 @@
                            FontSize="12" />
             </Border>
 
-            <!-- ============ Status cards ============ -->
+            <!-- ============ SYSTEM STATUS banner (spec §19) ============ -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <DockPanel>
+                    <Ellipse Style="{StaticResource StatusDot}"
+                             Fill="{Binding BannerTone, Converter={StaticResource ToneToBrush}}"
+                             DockPanel.Dock="Left"
+                             VerticalAlignment="Top"
+                             Margin="0,4,0,0" />
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="16,0,0,0">
+                        <Button Content="Event log"
+                                Command="{Binding GoToEventsCommand}"
+                                Style="{StaticResource Button.Ghost}" />
+                        <Button Content="Refresh"
+                                Command="{Binding RefreshCommand}"
+                                Margin="8,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Margin="14,0,0,0">
+                        <TextBlock Text="SYSTEM STATUS" Style="{StaticResource Text.Label}" />
+                        <TextBlock Text="{Binding BannerStatus}"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding BannerTone, Converter={StaticResource ToneToBrush}}"
+                                   Margin="0,6,0,0" />
+                        <TextBlock Text="{Binding BannerDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,5,0,0"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- ============ Status cards (spec §19) ============ -->
             <UniformGrid Columns="3">
 
-                <!-- System -->
+                <!-- Windows session -->
                 <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                     <StackPanel>
                         <DockPanel>
                             <Ellipse Style="{StaticResource StatusDot}"
-                                     Fill="{Binding SystemStatusTone, Converter={StaticResource ToneToBrush}}"
+                                     Fill="{Binding SessionTone, Converter={StaticResource ToneToBrush}}"
                                      DockPanel.Dock="Left" />
-                            <TextBlock Text="SYSTEM" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                            <TextBlock Text="WINDOWS SESSION" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
                         </DockPanel>
-                        <TextBlock Text="{Binding SystemStatus}"
+                        <TextBlock Text="{Binding SessionStatus}"
                                    FontSize="17"
                                    FontWeight="SemiBold"
-                                   Foreground="{Binding SystemStatusTone, Converter={StaticResource ToneToBrush}}"
+                                   Foreground="{Binding SessionTone, Converter={StaticResource ToneToBrush}}"
                                    Margin="0,12,0,0" />
-                        <TextBlock Text="{Binding SystemStatusDetail}"
+                        <TextBlock Text="{Binding SessionDetail}"
                                    Style="{StaticResource Text.Secondary}"
-                                   Margin="0,6,0,0" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Face profile -->
-                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
-                    <StackPanel>
-                        <DockPanel>
-                            <Ellipse Style="{StaticResource StatusDot}"
-                                     Fill="{Binding FaceProfileTone, Converter={StaticResource ToneToBrush}}"
-                                     DockPanel.Dock="Left" />
-                            <TextBlock Text="FACE PROFILE" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
-                        </DockPanel>
-                        <TextBlock Text="{Binding FaceProfileStatus}"
-                                   FontSize="17"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource Brush.TextPrimary}"
-                                   Margin="0,12,0,0" />
-                        <TextBlock Text="{Binding FaceProfileDetail}"
-                                   Style="{StaticResource Text.Secondary}"
-                                   Margin="0,6,0,0" />
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
                 <!-- Camera -->
-                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                     <StackPanel>
                         <DockPanel>
                             <Ellipse Style="{StaticResource StatusDot}"
@@ -84,6 +100,26 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Face profile -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding FaceProfileTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="FACE PROFILE" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding FaceProfileStatus}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource Brush.TextPrimary}"
+                                   Margin="0,12,0,0" />
+                        <TextBlock Text="{Binding FaceProfileDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Recognition engine -->
                 <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                     <StackPanel>
@@ -91,7 +127,7 @@
                             <Ellipse Style="{StaticResource StatusDot}"
                                      Fill="{Binding EngineTone, Converter={StaticResource ToneToBrush}}"
                                      DockPanel.Dock="Left" />
-                            <TextBlock Text="RECOGNITION ENGINE" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                            <TextBlock Text="RECOGNITION" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
                         </DockPanel>
                         <TextBlock Text="{Binding EngineStatus}"
                                    FontSize="17"
@@ -105,23 +141,44 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Last detection -->
+                <!-- Background monitoring -->
                 <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                     <StackPanel>
                         <DockPanel>
                             <Ellipse Style="{StaticResource StatusDot}"
-                                     Fill="{Binding LastDetectionTone, Converter={StaticResource ToneToBrush}}"
+                                     Fill="{Binding MonitoringCardTone, Converter={StaticResource ToneToBrush}}"
                                      DockPanel.Dock="Left" />
-                            <TextBlock Text="LAST DETECTION" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
-                            <TextBlock Text="{Binding LastDetectionTime}"
+                            <TextBlock Text="MONITORING" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding MonitoringCardStatus}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding MonitoringCardTone, Converter={StaticResource ToneToBrush}}"
+                                   Margin="0,12,0,0" />
+                        <TextBlock Text="{Binding MonitoringCardDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Last event -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding LastEventTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="LAST EVENT" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                            <TextBlock Text="{Binding LastEventTime}"
                                        Style="{StaticResource Text.Mono}"
                                        Foreground="{StaticResource Brush.TextMuted}"
                                        HorizontalAlignment="Right" />
                         </DockPanel>
-                        <TextBlock Text="{Binding LastDetection}"
+                        <TextBlock Text="{Binding LastEvent}"
                                    FontSize="17"
                                    FontWeight="SemiBold"
-                                   Foreground="{Binding LastDetectionTone, Converter={StaticResource ToneToBrush}}"
+                                   Foreground="{Binding LastEventTone, Converter={StaticResource ToneToBrush}}"
                                    Margin="0,12,0,0"
                                    TextWrapping="Wrap" />
                         <TextBlock Text="Events are stored locally only."
@@ -129,28 +186,110 @@
                                    Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
+            </UniformGrid>
 
-                <!-- Actions -->
-                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="QUICK ACTIONS" Style="{StaticResource Text.Label}" />
-                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                            <Button Content="Enroll face"
-                                    Command="{Binding GoToProfileCommand}"
-                                    Style="{StaticResource Button.Primary}" />
-                            <Button Content="Open camera"
-                                    Command="{Binding GoToCameraCommand}"
-                                    Margin="8,0,0,0" />
-                            <Button Content="Event log"
-                                    Command="{Binding GoToEventsCommand}"
-                                    Margin="8,0,0,0" />
-                        </StackPanel>
-                        <TextBlock Style="{StaticResource Text.Muted}"
-                                   Margin="0,14,0,0"
-                                   Text="Phase 2 does not unlock Windows." />
+            <!-- ============ Timeline + health (spec §20-21) ============ -->
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Icon-based security timeline -->
+                <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,6,12">
+                    <StackPanel>
+                        <TextBlock Text="SECURITY TIMELINE" Style="{StaticResource Text.Label}" />
+
+                        <ItemsControl ItemsSource="{Binding Timeline}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="26" />
+                                            <ColumnDefinition Width="46" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0"
+                                                Width="22"
+                                                Height="22"
+                                                CornerRadius="5"
+                                                Background="{StaticResource Brush.SurfaceAlt}">
+                                            <TextBlock Text="{Binding Glyph}"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="11"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{Binding Tone, Converter={StaticResource ToneToBrush}}" />
+                                        </Border>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Time}"
+                                                   Style="{StaticResource Text.Mono}"
+                                                   Foreground="{StaticResource Brush.TextMuted}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Text}"
+                                                   Style="{StaticResource Text.Secondary}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"
+                                                   Margin="6,0,0,0" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="No events recorded yet."
+                                   Style="{StaticResource Text.Muted}"
+                                   Margin="0,10,0,0"
+                                   Visibility="{Binding Timeline.Count, Converter={StaticResource ZeroToVisibility}}" />
                     </StackPanel>
                 </Border>
-            </UniformGrid>
+
+                <!-- System health -->
+                <Border Grid.Column="1" Style="{StaticResource Card}" Margin="6,0,0,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock Text="SYSTEM HEALTH" Style="{StaticResource Text.Label}" />
+                            <TextBlock Text="{Binding HealthSummary}"
+                                       Style="{StaticResource Text.Muted}"
+                                       HorizontalAlignment="Right" />
+                        </DockPanel>
+
+                        <ItemsControl ItemsSource="{Binding HealthRows}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,5,0,0">
+                                        <DockPanel>
+                                            <Ellipse Width="7"
+                                                     Height="7"
+                                                     Fill="{Binding Tone, Converter={StaticResource ToneToBrush}}"
+                                                     DockPanel.Dock="Left"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Name}"
+                                                       Style="{StaticResource Text.Body}"
+                                                       Margin="8,0,0,0"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Status}"
+                                                       Style="{StaticResource Text.Mono}"
+                                                       Foreground="{Binding Tone, Converter={StaticResource ToneToBrush}}"
+                                                       HorizontalAlignment="Right" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Detail}"
+                                                   Style="{StaticResource Text.Muted}"
+                                                   Margin="15,2,0,0"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="Health data is published by the background monitor every few seconds."
+                                   Style="{StaticResource Text.Muted}"
+                                   Margin="0,10,0,0"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding HealthRows.Count, Converter={StaticResource ZeroToVisibility}}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <!-- ============ Recent events ============ -->
             <Border Style="{StaticResource Card}" Margin="0,2,0,0">
@@ -186,15 +325,25 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource Card}" Margin="0,14,0,0" Background="{StaticResource Brush.SurfaceAlt}">
+            <!-- ============ Quick actions ============ -->
+            <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                 <StackPanel>
-                    <TextBlock Text="RECOGNITION READINESS" Style="{StaticResource Text.Label}" />
-                    <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,8,0,0"
-                               Text="{Binding EngineDetail}" />
-                    <Button Content="Refresh status"
-                            Command="{Binding RefreshCommand}"
-                            HorizontalAlignment="Left"
-                            Margin="0,12,0,0" />
+                    <TextBlock Text="QUICK ACTIONS" Style="{StaticResource Text.Label}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button Content="Enroll face"
+                                Command="{Binding GoToProfileCommand}"
+                                Style="{StaticResource Button.Primary}" />
+                        <Button Content="Open camera"
+                                Command="{Binding GoToCameraCommand}"
+                                Margin="8,0,0,0" />
+                        <Button Content="Event log"
+                                Command="{Binding GoToEventsCommand}"
+                                Margin="8,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource Text.Muted}"
+                               Margin="0,12,0,0"
+                               TextWrapping="Wrap"
+                               Text="SECURITY.EXE does not replace Windows authentication — it never unlocks or locks Windows." />
                 </StackPanel>
             </Border>
 

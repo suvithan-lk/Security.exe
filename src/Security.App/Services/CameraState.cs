@@ -20,6 +20,14 @@ public enum CameraState
     /// <summary>Capturing and rendering. Show LIVE.</summary>
     Live,
 
+    /// <summary>
+    /// Stopped by the background monitor because Windows locked the session
+    /// (Phase 3, spec §5). Show PAUSED; an unlock resumes automatically when
+    /// monitoring settings allow it. Deliberately distinct from Offline so the
+    /// badge never claims the camera was switched off by the operator.
+    /// </summary>
+    Paused,
+
     /// <summary>Start or capture failed. Show CAMERA UNAVAILABLE with causes and Retry.</summary>
     Error,
 }

@@ -214,7 +214,9 @@ public class FrameProcessorAnalysisTests
             Core.Enums.SecurityEventResult result,
             string description,
             double? confidence = null,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            Core.Enums.SessionState? sessionState = null,
+            string? snapshotPath = null)
             => Task.FromResult(new Core.Entities.SecurityEvent());
     }
 

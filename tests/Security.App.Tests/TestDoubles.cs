@@ -104,6 +104,8 @@ internal sealed class FakeFrameProcessor : IFrameProcessor
 
     public bool RecognitionSuppressed { get; set; }
 
+    public bool UnknownFaceDetectionEnabled { get; set; } = true;
+
     public Func<Mat, CancellationToken, Task>? FrameSink { get; set; }
 
     public int AttachCount { get; private set; }
@@ -249,7 +251,9 @@ internal sealed class RecordingEventService : ISecurityEventService
         SecurityEventResult result,
         string description,
         double? confidence = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Core.Enums.SessionState? sessionState = null,
+        string? snapshotPath = null)
     {
         var securityEvent = new SecurityEvent
         {
@@ -258,11 +262,56 @@ internal sealed class RecordingEventService : ISecurityEventService
             Description = description,
             Confidence = confidence,
             Timestamp = DateTime.UtcNow,
+            SessionState = sessionState,
+            SnapshotPath = snapshotPath,
         };
 
         lock (_recorded)
             _recorded.Add(securityEvent);
 
         return Task.FromResult(securityEvent);
+    }
+}
+
+/// <summary>
+/// In-memory stand-in for the Windows session observer. Tests set
+/// <see cref="CurrentState"/> directly and raise transitions with
+/// <see cref="RaiseSessionStateChanged"/>; Start/Stop are recorded so the
+/// monitor's SessionMonitoring wiring can be asserted without touching
+/// SystemEvents.
+/// </summary>
+internal sealed class FakeWindowsSessionService : IWindowsSessionService
+{
+    /// <summary>Defaults to Unlocked — the common case; tests set Unknown/Locked explicitly.</summary>
+    public SessionState CurrentState { get; set; } = SessionState.Unlocked;
+
+    public bool IsInitialized { get; set; }
+
+    public bool StartCalled { get; private set; }
+
+    public bool StopCalled { get; private set; }
+
+    public event EventHandler<SessionStateChangedEventArgs>? SessionStateChanged;
+
+    public void Start()
+    {
+        StartCalled = true;
+        IsInitialized = true;
+    }
+
+    public void Stop() => StopCalled = true;
+
+    public SessionState RefreshLockState() => CurrentState;
+
+    /// <summary>Simulate a Windows broadcast: updates state, then notifies.</summary>
+    public void RaiseSessionStateChanged(SessionState next)
+    {
+        var previous = CurrentState;
+        CurrentState = next;
+        SessionStateChanged?.Invoke(this, new SessionStateChangedEventArgs(previous, next));
+    }
+
+    public void Dispose()
+    {
     }
 }

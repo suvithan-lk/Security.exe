@@ -62,10 +62,11 @@
                     <Separator Style="{StaticResource Divider}" Margin="0,0,0,8" />
                     <TextBlock Text="{Binding VersionLabel}"
                                Style="{StaticResource Text.Muted}" />
-                    <TextBlock Text="Phase 2 does not unlock Windows."
+                    <TextBlock Text="SECURITY.EXE does not replace Windows authentication."
                                Style="{StaticResource Text.Muted}"
                                Foreground="{StaticResource Brush.Warning}"
-                               Margin="0,4,0,0" />
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap" />
                 </StackPanel>
 
                 <!-- Navigation -->
@@ -123,6 +124,16 @@
                                          Fill="{StaticResource Brush.Success}" />
                                 <TextBlock Text="LOCAL ONLY" Style="{StaticResource Text.Muted}"
                                            Margin="7,0,0,0" Foreground="{StaticResource Brush.Success}" />
+                            </StackPanel>
+                        </Border>
+                        <!-- Shown ONLY while frames are actually being captured. -->
+                        <Border Style="{StaticResource Badge}" Margin="8,0,0,0"
+                                Visibility="{Binding CameraActive, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                         Fill="{StaticResource Brush.Accent}" />
+                                <TextBlock Text="CAMERA ACTIVE" Style="{StaticResource Text.Muted}"
+                                           Margin="7,0,0,0" Foreground="{StaticResource Brush.Accent}" />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Badge}" Margin="8,0,0,0">

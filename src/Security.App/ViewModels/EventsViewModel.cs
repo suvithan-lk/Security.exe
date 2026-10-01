@@ -7,6 +7,7 @@ using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Security.App.Mvvm;
 using Security.App.Services;
+using Security.App.Views;
 using Security.Core.Entities;
 using Security.Core.Enums;
 using Security.Core.Interfaces;
@@ -23,9 +24,33 @@ public sealed class EventTypeOption
     public override string ToString() => Label;
 }
 
+/// <summary>One row in the result filter (All results + every recorded outcome).</summary>
+public sealed class EventResultOption
+{
+    public required string Label { get; init; }
+
+    public SecurityEventResult? Value { get; init; }
+
+    public override string ToString() => Label;
+}
+
+/// <summary>One row in the session filter (All sessions + every observed state).</summary>
+public sealed class SessionFilterOption
+{
+    public required string Label { get; init; }
+
+    public SessionState? Value { get; init; }
+
+    /// <summary>True for events recorded before session tracking (SessionState null).</summary>
+    public bool MatchUnset { get; init; }
+
+    public override string ToString() => Label;
+}
+
 /// <summary>
-/// Event log browser: filter by type and date range, live tail of new events,
-/// and a confirmed clear action.
+/// Event log browser: filter by type, date range, result, session state and
+/// description text, live tail of new events, an event-details dialog, and a
+/// confirmed clear action.
 /// </summary>
 public sealed class EventsViewModel : ViewModelBase
 {
@@ -36,9 +61,16 @@ public sealed class EventsViewModel : ViewModelBase
     private readonly ILogger<EventsViewModel>? _logger;
 
     private EventTypeOption _selectedType;
+    private EventResultOption _selectedResult;
+    private SessionFilterOption _selectedSession;
     private DateTime? _fromDate;
     private DateTime? _toDate;
+    private string _searchText = string.Empty;
     private string _summary = "0 events";
+    private SecurityEvent? _selectedEvent;
+
+    /// <summary>Rows as returned by the type/date query; result/session/text filters are applied on top.</summary>
+    private List<SecurityEvent> _rows = new();
 
     public EventsViewModel(
         ISecurityEventService events,
@@ -52,10 +84,19 @@ public sealed class EventsViewModel : ViewModelBase
         TypeFilters = BuildTypeFilters();
         _selectedType = TypeFilters[0];
 
+        ResultFilters = BuildResultFilters();
+        _selectedResult = ResultFilters[0];
+
+        SessionFilters = BuildSessionFilters();
+        _selectedSession = SessionFilters[0];
+
         Events = new ObservableCollection<SecurityEvent>();
 
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         ClearCommand = new AsyncRelayCommand(ClearAsync);
+        ShowDetailsCommand = new RelayCommand(
+            () => ShowDetails(SelectedEvent),
+            () => SelectedEvent is not null);
 
         _events.EventRecorded += OnEventRecorded;
     }
@@ -66,6 +107,10 @@ public sealed class EventsViewModel : ViewModelBase
 
     public IReadOnlyList<EventTypeOption> TypeFilters { get; }
 
+    public IReadOnlyList<EventResultOption> ResultFilters { get; }
+
+    public IReadOnlyList<SessionFilterOption> SessionFilters { get; }
+
     public EventTypeOption SelectedType
     {
         get => _selectedType;
@@ -75,6 +120,45 @@ public sealed class EventsViewModel : ViewModelBase
                 return;
 
             _ = RefreshAsync();
+        }
+    }
+
+    /// <summary>Result (outcome) filter. "All results" = null.</summary>
+    public EventResultOption SelectedResult
+    {
+        get => _selectedResult;
+        set
+        {
+            if (!SetProperty(ref _selectedResult, value))
+                return;
+
+            ApplyFilters();
+        }
+    }
+
+    /// <summary>Windows session filter. "All sessions" = null.</summary>
+    public SessionFilterOption SelectedSession
+    {
+        get => _selectedSession;
+        set
+        {
+            if (!SetProperty(ref _selectedSession, value))
+                return;
+
+            ApplyFilters();
+        }
+    }
+
+    /// <summary>Case-insensitive search over the description column.</summary>
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (!SetProperty(ref _searchText, value ?? string.Empty))
+                return;
+
+            ApplyFilters();
         }
     }
 
@@ -104,17 +188,39 @@ public sealed class EventsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Event currently selected in the table (details dialog source).</summary>
+    public SecurityEvent? SelectedEvent
+    {
+        get => _selectedEvent;
+        set
+        {
+            if (!SetProperty(ref _selectedEvent, value))
+                return;
+
+            (ShowDetailsCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
     public string Summary
     {
         get => _summary;
         private set => SetProperty(ref _summary, value);
     }
 
-    public bool HasFilters => SelectedType?.Value is not null || FromDate is not null || ToDate is not null;
+    public bool HasFilters =>
+        SelectedType?.Value is not null ||
+        SelectedResult?.Value is not null ||
+        SelectedSession is { Value: not null } ||
+        SelectedSession is { MatchUnset: true } ||
+        !string.IsNullOrWhiteSpace(SearchText) ||
+        FromDate is not null ||
+        ToDate is not null;
 
     public ICommand RefreshCommand { get; }
 
     public ICommand ClearCommand { get; }
+
+    public ICommand ShowDetailsCommand { get; }
 
     #endregion
 
@@ -126,6 +232,29 @@ public sealed class EventsViewModel : ViewModelBase
 
         foreach (SecurityEventType type in Enum.GetValues<SecurityEventType>())
             options.Add(new EventTypeOption { Label = SplitPascal(type.ToString()), Value = type });
+
+        return options;
+    }
+
+    private static IReadOnlyList<EventResultOption> BuildResultFilters()
+    {
+        var options = new List<EventResultOption> { new() { Label = "All results", Value = null } };
+
+        foreach (SecurityEventResult result in Enum.GetValues<SecurityEventResult>())
+            options.Add(new EventResultOption { Label = SplitPascal(result.ToString()), Value = result });
+
+        return options;
+    }
+
+    private static IReadOnlyList<SessionFilterOption> BuildSessionFilters()
+    {
+        var options = new List<SessionFilterOption> { new() { Label = "All sessions", Value = null } };
+
+        // "Not recorded" matches events written before session tracking (null).
+        options.Add(new SessionFilterOption { Label = "Not recorded", Value = null, MatchUnset = true });
+
+        foreach (SessionState state in Enum.GetValues<SessionState>())
+            options.Add(new SessionFilterOption { Label = state.ToDisplayText(), Value = state });
 
         return options;
     }
@@ -173,12 +302,8 @@ public sealed class EventsViewModel : ViewModelBase
                 toUtc,
                 MaxRows);
 
-            Events.Clear();
-            foreach (var row in rows)
-                Events.Add(row);
-
-            Summary = BuildSummary(rows.Count);
-            OnPropertyChanged(nameof(HasFilters));
+            _rows = new List<SecurityEvent>(rows);
+            ApplyFilters();
         }
         catch (OperationCanceledException)
         {
@@ -192,6 +317,74 @@ public sealed class EventsViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Project <see cref="_rows"/> through the result / session / description
+    /// filters. Those three are evaluated here rather than in SQL because the
+    /// type + date query already bounds the row set to <see cref="MaxRows"/>.
+    /// </summary>
+    private void ApplyFilters()
+    {
+        Events.Clear();
+
+        foreach (var row in _rows)
+        {
+            if (Matches(row))
+                Events.Add(row);
+        }
+
+        SelectedEvent = null;
+        Summary = BuildSummary(Events.Count);
+        OnPropertyChanged(nameof(HasFilters));
+    }
+
+    private bool Matches(SecurityEvent e)
+    {
+        if (SelectedResult?.Value is { } result && e.Result != result)
+            return false;
+
+        if (SelectedSession is { MatchUnset: true })
+        {
+            if (e.SessionState is not null)
+                return false;
+        }
+        else if (SelectedSession?.Value is { } session && e.SessionState != session)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchText) &&
+            !e.Description.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Open the details dialog for the given event (no-op when null).</summary>
+    private void ShowDetails(SecurityEvent? evt)
+    {
+        if (evt is null)
+            return;
+
+        try
+        {
+            var window = new EventDetailsWindow(evt);
+            if (System.Windows.Application.Current?.MainWindow is { } owner &&
+                owner.IsVisible && !ReferenceEquals(owner, window))
+            {
+                window.Owner = owner;
+            }
+
+            window.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Opening event details failed");
+            ReportError("Could not open the event details window.", ex);
         }
     }
 
@@ -216,7 +409,9 @@ public sealed class EventsViewModel : ViewModelBase
         try
         {
             await _events.ClearAsync();
+            _rows.Clear();
             Events.Clear();
+            SelectedEvent = null;
             Summary = "No security events recorded yet.";
         }
         catch (Exception ex)
@@ -230,7 +425,7 @@ public sealed class EventsViewModel : ViewModelBase
     {
         _ = System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
         {
-            // Respect active filters rather than blindly tailing.
+            // Respect active type/date filters rather than blindly tailing.
             if (SelectedType?.Value is { } type && type != e.EventType)
                 return;
 
@@ -240,12 +435,12 @@ public sealed class EventsViewModel : ViewModelBase
             if (ToDate is { } to && e.Timestamp > to.Date.AddDays(1).AddTicks(-1).ToUniversalTime())
                 return;
 
-            Events.Insert(0, e);
+            _rows.Insert(0, e);
 
-            while (Events.Count > MaxRows)
-                Events.RemoveAt(Events.Count - 1);
+            while (_rows.Count > MaxRows)
+                _rows.RemoveAt(_rows.Count - 1);
 
-            Summary = BuildSummary(Events.Count);
+            ApplyFilters();
         }));
     }
 }
