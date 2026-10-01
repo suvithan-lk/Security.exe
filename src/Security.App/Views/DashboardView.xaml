@@ -1,0 +1,203 @@
+<UserControl x:Class="Security.App.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Focusable="False">
+        <StackPanel>
+
+            <!-- Inline, non-fatal error -->
+            <Border Background="#3A1216"
+                    BorderBrush="{StaticResource Brush.Danger}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12"
+                    Margin="0,0,0,14"
+                    Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="{StaticResource Brush.Danger}"
+                           TextWrapping="Wrap"
+                           FontSize="12" />
+            </Border>
+
+            <!-- ============ Status cards ============ -->
+            <UniformGrid Columns="3">
+
+                <!-- System -->
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding SystemStatusTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="SYSTEM" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding SystemStatus}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding SystemStatusTone, Converter={StaticResource ToneToBrush}}"
+                                   Margin="0,12,0,0" />
+                        <TextBlock Text="{Binding SystemStatusDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Face profile -->
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding FaceProfileTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="FACE PROFILE" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding FaceProfileStatus}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource Brush.TextPrimary}"
+                                   Margin="0,12,0,0" />
+                        <TextBlock Text="{Binding FaceProfileDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Camera -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding CameraTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="CAMERA" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding CameraStatus}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource Brush.TextPrimary}"
+                                   Margin="0,12,0,0" />
+                        <TextBlock Text="{Binding CameraDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Recognition engine -->
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding EngineTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="RECOGNITION ENGINE" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding EngineStatus}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding EngineTone, Converter={StaticResource ToneToBrush}}"
+                                   Margin="0,12,0,0"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding EngineDetail}"
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Last detection -->
+                <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                    <StackPanel>
+                        <DockPanel>
+                            <Ellipse Style="{StaticResource StatusDot}"
+                                     Fill="{Binding LastDetectionTone, Converter={StaticResource ToneToBrush}}"
+                                     DockPanel.Dock="Left" />
+                            <TextBlock Text="LAST DETECTION" Style="{StaticResource Text.Label}" Margin="9,0,0,0" />
+                            <TextBlock Text="{Binding LastDetectionTime}"
+                                       Style="{StaticResource Text.Mono}"
+                                       Foreground="{StaticResource Brush.TextMuted}"
+                                       HorizontalAlignment="Right" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding LastDetection}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding LastDetectionTone, Converter={StaticResource ToneToBrush}}"
+                                   Margin="0,12,0,0"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="Events are stored locally only."
+                                   Style="{StaticResource Text.Secondary}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Actions -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="QUICK ACTIONS" Style="{StaticResource Text.Label}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                            <Button Content="Enroll face"
+                                    Command="{Binding GoToProfileCommand}"
+                                    Style="{StaticResource Button.Primary}" />
+                            <Button Content="Open camera"
+                                    Command="{Binding GoToCameraCommand}"
+                                    Margin="8,0,0,0" />
+                            <Button Content="Event log"
+                                    Command="{Binding GoToEventsCommand}"
+                                    Margin="8,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Text.Muted}"
+                                   Margin="0,14,0,0"
+                                   Text="Phase 2 does not unlock Windows." />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- ============ Recent events ============ -->
+            <Border Style="{StaticResource Card}" Margin="0,2,0,0">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <TextBlock Text="{Binding RecentEventsHeader}" Style="{StaticResource Text.Heading}" />
+                        <Button Content="View all"
+                                Command="{Binding GoToEventsCommand}"
+                                DockPanel.Dock="Right"
+                                Style="{StaticResource Button.Ghost}" />
+                    </DockPanel>
+
+                    <!--
+                      ContentTemplate + non-null Content: the header row is a
+                      DataTemplate, so it must be applied AS A TEMPLATE. The old
+                      code put the template into Content, which made the
+                      ContentControl render DataTemplate.ToString() — literally
+                      printing "System.Windows.DataTemplate" onto the screen.
+                    -->
+                    <ContentControl Content="{Binding}"
+                                    ContentTemplate="{StaticResource Template.EventHeader}"
+                                    IsHitTestVisible="False" />
+                    <Separator Style="{StaticResource Divider}" Margin="0,0,0,2" />
+
+                    <ItemsControl ItemsSource="{Binding RecentEvents}"
+                                  ItemTemplate="{StaticResource Template.EventRow}" />
+
+                    <TextBlock Text="No security events yet."
+                               Style="{StaticResource Text.Secondary}"
+                               HorizontalAlignment="Center"
+                               Margin="0,14"
+                               Visibility="{Binding RecentEvents.Count, Converter={StaticResource ZeroToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,14,0,0" Background="{StaticResource Brush.SurfaceAlt}">
+                <StackPanel>
+                    <TextBlock Text="RECOGNITION READINESS" Style="{StaticResource Text.Label}" />
+                    <TextBlock Style="{StaticResource Text.Secondary}" Margin="0,8,0,0"
+                               Text="{Binding EngineDetail}" />
+                    <Button Content="Refresh status"
+                            Command="{Binding RefreshCommand}"
+                            HorizontalAlignment="Left"
+                            Margin="0,12,0,0" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

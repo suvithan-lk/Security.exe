@@ -1,0 +1,104 @@
+<UserControl x:Class="Security.App.Views.EventsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== Header + filters ==================== -->
+        <StackPanel Grid.Row="0">
+            <DockPanel Margin="0,0,0,12">
+                <TextBlock Text="Security Events" Style="{StaticResource Text.Title}" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Clear log"
+                            Command="{Binding ClearCommand}"
+                            Style="{StaticResource Button.Danger}"
+                            Margin="8,0,0,0" />
+                    <Button Content="Refresh"
+                            Command="{Binding RefreshCommand}" />
+                </StackPanel>
+            </DockPanel>
+
+            <Border Style="{StaticResource Card.Compact}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel Margin="0,0,18,0">
+                            <TextBlock Text="EVENT TYPE" Style="{StaticResource Text.Label}" />
+                            <ComboBox ItemsSource="{Binding TypeFilters}"
+                                      SelectedItem="{Binding SelectedType, Mode=TwoWay}"
+                                      Width="210"
+                                      Margin="0,7,0,0"
+                                      Style="{StaticResource Input.ComboBox}"
+                                      ItemContainerStyle="{StaticResource Input.ComboBox.Item}" />
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,18,0">
+                            <TextBlock Text="FROM" Style="{StaticResource Text.Label}" />
+                            <DatePicker SelectedDate="{Binding FromDate, Mode=TwoWay}"
+                                        Margin="0,7,0,0"
+                                        Width="150" />
+                        </StackPanel>
+
+                        <StackPanel>
+                            <TextBlock Text="TO" Style="{StaticResource Text.Label}" />
+                            <DatePicker SelectedDate="{Binding ToDate, Mode=TwoWay}"
+                                        Margin="0,7,0,0"
+                                        Width="150" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding Summary}"
+                               Style="{StaticResource Text.Secondary}"
+                               Margin="0,12,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#3A1216"
+                    BorderBrush="{StaticResource Brush.Danger}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12"
+                    Margin="0,12,0,0"
+                    Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="{StaticResource Brush.Danger}"
+                           TextWrapping="Wrap"
+                           FontSize="12" />
+            </Border>
+        </StackPanel>
+
+        <!-- ==================== Table ==================== -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,14,0,0" Padding="14">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Must be applied as ContentTemplate (see DashboardView). -->
+                <ContentControl Grid.Row="0"
+                                Content="{Binding}"
+                                ContentTemplate="{StaticResource Template.EventHeader}"
+                                IsHitTestVisible="False" />
+                <Separator Grid.Row="0" Style="{StaticResource Divider}" VerticalAlignment="Bottom" Margin="0" />
+
+                <Grid Grid.Row="1">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                        <ItemsControl ItemsSource="{Binding Events}"
+                                      ItemTemplate="{StaticResource Template.EventRow}" />
+                    </ScrollViewer>
+
+                    <TextBlock Text="No events to display."
+                               Style="{StaticResource Text.Secondary}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding Events.Count, Converter={StaticResource ZeroToVisibility}}" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

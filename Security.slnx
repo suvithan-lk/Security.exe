@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Security.App/Security.App.csproj" />
+    <Project Path="src/Security.Core/Security.Core.csproj" />
+    <Project Path="src/Security.Data/Security.Data.csproj" />
+    <Project Path="src/Security.Face/Security.Face.csproj" />
+    <Project Path="src/Security.Infrastructure/Security.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Security.App.Tests/Security.App.Tests.csproj" />
+    <Project Path="tests/Security.Core.Tests/Security.Core.Tests.csproj" />
+    <Project Path="tests/Security.Data.Tests/Security.Data.Tests.csproj" />
+    <Project Path="tests/Security.Face.Tests/Security.Face.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Security.Diag/Security.Diag.csproj" />
+  </Folder>
+</Solution>

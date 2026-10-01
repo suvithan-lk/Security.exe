@@ -1,0 +1,46 @@
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ---- IDE / tooling ----
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---- Runtime data (never committed) ----
+# Local SQLite database containing the encrypted face profile and event log.
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Rolling application logs.
+logs/
+*.log
+
+# ---- ONNX models ----
+# ~37 MB of third-party binaries; fetched by scripts/download-models.ps1
+# (or automatically on first run). See models/README.md for source + licence.
+models/*.onnx
+models/*.download
+models/*.tmp
+!models/README.md
+
+# ---- Test / coverage results ----
+TestResults/
+coverage*/
+*.coverage
+*.trx
+
+# ---- OS noise ----
+Thumbs.db
+desktop.ini
+.DS_Store

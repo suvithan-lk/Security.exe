@@ -1,0 +1,247 @@
+﻿<Window x:Class="Security.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:Security.App.ViewModels"
+        Title="{Binding WindowTitle}"
+        Width="1280"
+        Height="800"
+        MinWidth="1060"
+        MinHeight="660"
+        Background="{StaticResource Brush.Background}"
+        FontFamily="Segoe UI"
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="232" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ==================== Sidebar ==================== -->
+        <Border Grid.Column="0"
+                Background="#090C11"
+                BorderBrush="{StaticResource Brush.Border}"
+                BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True">
+
+                <!-- Brand -->
+                <StackPanel DockPanel.Dock="Top" Margin="18,20,18,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="30" Height="30"
+                                CornerRadius="7"
+                                Background="{StaticResource Brush.NavActive}"
+                                BorderBrush="{StaticResource Brush.Accent}"
+                                BorderThickness="1">
+                            <TextBlock Text="&#xE72E;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="15"
+                                       Foreground="{StaticResource Brush.Accent}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="SECURITY.EXE"
+                                       FontSize="13"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource Brush.TextPrimary}" />
+                            <TextBlock Text="Local face security"
+                                       FontSize="10"
+                                       Foreground="{StaticResource Brush.TextMuted}" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Version -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="18,8,18,16">
+                    <Separator Style="{StaticResource Divider}" Margin="0,0,0,8" />
+                    <TextBlock Text="{Binding VersionLabel}"
+                               Style="{StaticResource Text.Muted}" />
+                    <TextBlock Text="Phase 2 does not unlock Windows."
+                               Style="{StaticResource Text.Muted}"
+                               Foreground="{StaticResource Brush.Warning}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+
+                <!-- Navigation -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="SECURITY"
+                           Style="{StaticResource Text.Label}"
+                           Margin="18,14,18,2" />
+                <ListBox ItemsSource="{Binding NavItems}"
+                         SelectedItem="{Binding SelectedNav, Mode=TwoWay}"
+                         ItemContainerStyle="{StaticResource Nav.Button}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="0,8"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         Focusable="False">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- ==================== Main ==================== -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Top bar -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource Brush.Surface}"
+                    BorderBrush="{StaticResource Brush.Border}"
+                    BorderThickness="0,0,0,1"
+                    Padding="22,14">
+                <DockPanel LastChildFill="False">
+
+                    <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SelectedNav.Label}"
+                                   Style="{StaticResource Text.Title}" />
+                        <TextBlock Text="{Binding VersionLabel}"
+                                   Style="{StaticResource Text.Muted}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Border Style="{StaticResource Badge}" Margin="8,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                         Fill="{StaticResource Brush.Success}" />
+                                <TextBlock Text="LOCAL ONLY" Style="{StaticResource Text.Muted}"
+                                           Margin="7,0,0,0" Foreground="{StaticResource Brush.Success}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Badge}" Margin="8,0,0,0">
+                            <TextBlock Text="DPAPI ENCRYPTED" Style="{StaticResource Text.Muted}" />
+                        </Border>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Screen host -->
+            <ContentControl Grid.Row="1"
+                            Content="{Binding CurrentViewModel}"
+                            Margin="22,18,22,22"
+                            Focusable="False" />
+
+            <!-- In-app unknown-face alert (never shown on the Windows lock screen) -->
+            <Border Grid.Row="1"
+                    Margin="0,14,22,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Width="380"
+                    CornerRadius="9"
+                    Padding="14"
+                    Background="#3A1216"
+                    BorderBrush="{StaticResource Brush.Danger}"
+                    BorderThickness="1"
+                    Visibility="{Binding AlertVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="SECURITY ALERT"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource Brush.Danger}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding AlertTime}"
+                                   Style="{StaticResource Text.Muted}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding AlertMessage}"
+                               Foreground="{StaticResource Brush.TextPrimary}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Margin="0,7,0,0" />
+                    <Button Content="Dismiss"
+                            Command="{Binding DismissAlertCommand}"
+                            HorizontalAlignment="Right"
+                            Margin="0,10,0,0"
+                            Style="{StaticResource Button.Ghost}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== Application toasts ====================
+             Auto-dismissing, manually closable, non-blocking.
+             The container deliberately has no Background: empty space does not
+             hit-test, so the page underneath keeps working while a toast is on
+             screen. Toasts are rendered inside this window only — they never
+             reach the Windows Secure Desktop, the lock screen, or Action
+             Center. -->
+        <ItemsControl Grid.ColumnSpan="2"
+                      ItemsSource="{Binding Toasts.Items}"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Bottom"
+                      Margin="0,0,26,26">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Width="340"
+                            CornerRadius="8"
+                            Padding="14,11"
+                            Margin="0,8,0,0"
+                            Background="{Binding Tint}"
+                            BorderBrush="{Binding Accent}"
+                            BorderThickness="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <DockPanel>
+                                    <Ellipse Width="7" Height="7"
+                                             Fill="{Binding Accent}"
+                                             VerticalAlignment="Center"
+                                             DockPanel.Dock="Left" />
+                                    <TextBlock Text="{Binding Title}"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
+                                               Foreground="{Binding Accent}"
+                                               Margin="8,0,0,0"
+                                               TextWrapping="Wrap" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding Message}"
+                                           Style="{StaticResource Text.Secondary}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Margin="15,5,0,0" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                                    Content="&#xE711;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="11"
+                                    Padding="7,5"
+                                    Margin="10,0,0,0"
+                                    VerticalAlignment="Top"
+                                    Command="{Binding DismissCommand}"
+                                    ToolTip="Dismiss"
+                                    Style="{StaticResource Button.Ghost}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</Window>

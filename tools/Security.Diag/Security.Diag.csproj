@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Security.Diag</RootNamespace>
+    <AssemblyName>Security.Diag</AssemblyName>
+    <!-- Console harness: no WPF, no app icon, no host ambiguity. -->
+    <UseWPF>false</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Security.Core\Security.Core.csproj" />
+    <ProjectReference Include="..\..\src\Security.Face\Security.Face.csproj" />
+    <ProjectReference Include="..\..\src\Security.Data\Security.Data.csproj" />
+    <ProjectReference Include="..\..\src\Security.Infrastructure\Security.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
